@@ -48,7 +48,20 @@ Projeto e esquema fechados, com os esboços da interface web prontos. Aguardando
 
 ## Como compilar e gravar
 
-> A definir quando o firmware começar. Esta seção vai trazer o ambiente (Arduino IDE ou PlatformIO), as bibliotecas, como gravar o firmware e os arquivos da página web (pasta `firmware/data`) e como fazer a primeira configuração (Wi-Fi, latitude, horário).
+O firmware usa o **PlatformIO** (extensão do VS Code). Abra a pasta `firmware/` no VS Code.
+
+| Tarefa | Comando |
+| --- | --- |
+| Compilar para o simulador | `pio run -e esp32s3` |
+| Gravar na placa real (N16R8) | `pio run -e esp32s3-n16r8 -t upload` |
+| Rodar os testes no computador | `pio test -e native` |
+| Abrir o monitor serial | `pio device monitor` |
+
+**Simulação no Wokwi:** instale a extensão Wokwi no VS Code, compile com `pio run -e esp32s3` e rode **Wokwi: Start Simulator**. Os LEDs fazem o papel dos relés e acendem quando o pino vai a LOW, como a placa ativa em nível baixo. Os setores ficam em verde e a bomba em vermelho.
+
+**Comandos no monitor serial (v0.1):** `l N S` liga o setor N por S segundos, `c S` faz o ciclo com S segundos por setor, `p` pula, `x N` para o setor N, `s` para tudo e `?` mostra o estado.
+
+**Credenciais:** copie `firmware/include/secrets.example.h` para `secrets.h` e preencha. O `secrets.h` não vai para o repositório.
 
 Bibliotecas previstas: U8g2 (display), ESP32Encoder (encoder), RTClib (DS3231), drivers do BME280 e do VEML7700, LittleFS, SD e Preferences.
 

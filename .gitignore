@@ -22,3 +22,6 @@ __pycache__/
 # Dados exportados do controlador
 *.log
 dados/
+
+# Wokwi
+firmware/.wokwi/
