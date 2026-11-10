@@ -45,6 +45,7 @@ Projeto e esquema fechados, com os esboços da interface web prontos. Aguardando
 | [docs/requisitos.md](docs/requisitos.md) | Objetivos, requisitos, escopo, limitações e roteiro |
 | [docs/arquitetura.md](docs/arquitetura.md) | Software, lógica de irrigação, interface e dados |
 | [docs/hardware.md](docs/hardware.md) | Componentes, alimentação, ligações, caixa e proteções |
+| [docs/caixa.md](docs/caixa.md) | Caixa impressa em 3D: leiaute, medidas, impressão e montagem |
 | [docs/mapa-de-pinos.md](docs/mapa-de-pinos.md) | GPIOs do ESP32-S3 e endereços I2C |
 | [docs/api.md](docs/api.md) | Comunicação entre a página web e o firmware |
 | [CHANGELOG.md](CHANGELOG.md) | Histórico de versões |
