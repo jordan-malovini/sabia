@@ -44,6 +44,7 @@ Projeto e esquema fechados, com os esboços da interface web prontos. Aguardando
 | [docs/arquitetura.md](docs/arquitetura.md) | Software, lógica de irrigação, interface e dados |
 | [docs/hardware.md](docs/hardware.md) | Componentes, alimentação, ligações, caixa e proteções |
 | [docs/mapa-de-pinos.md](docs/mapa-de-pinos.md) | GPIOs do ESP32-S3 e endereços I2C |
+| [docs/api.md](docs/api.md) | Comunicação entre a página web e o firmware |
 | [CHANGELOG.md](CHANGELOG.md) | Histórico de versões |
 
 ## Como compilar e gravar
@@ -60,6 +61,8 @@ O firmware usa o **PlatformIO** (extensão do VS Code). Abra a pasta `firmware/`
 **Simulação no Wokwi:** instale a extensão Wokwi no VS Code, compile com `pio run -e esp32s3` e rode **Wokwi: Start Simulator**. Os LEDs fazem o papel dos relés e acendem quando o pino vai a LOW, como a placa ativa em nível baixo. Os setores ficam em verde e a bomba em vermelho.
 
 **Comandos no monitor serial (v0.1):** `l N S` liga o setor N por S segundos, `c S` faz o ciclo com S segundos por setor, `p` pula, `x N` para o setor N, `s` para tudo e `?` mostra o estado.
+
+**Página web:** abra `firmware/data/index.html` no navegador para ver em modo demonstração (dados simulados, qualquer senha). Testes: `node tests/pagina/teste-pagina.mjs` (precisa do Node 22 e do Google Chrome).
 
 **Credenciais:** copie `firmware/include/secrets.example.h` para `secrets.h` e preencha. O `secrets.h` não vai para o repositório.
 

@@ -11,6 +11,10 @@ Formato: uma seção por versão, da mais nova para a mais antiga.
 - Saídas configuradas como desligadas antes de virarem saída, no boot (RF14).
 - Circuito do Wokwi com LEDs no lugar dos relés e comandos pelo monitor serial.
 - 12 testes automáticos da fila e da sequência.
+- GitHub Actions: testes e compilação do firmware a cada PR e push na `main`.
+- Página web local (`firmware/data/index.html`): painel, histórico e ajustes completos, com modo demonstração enquanto o firmware não tem a API.
+- Contrato da API entre a página e o firmware (`docs/api.md`).
+- 31 testes de interação da página no Chrome sem janela (`tests/pagina/`).
 - Nome do projeto: SABIÁ (Sistema Automático de Balanço e Irrigação Agrícola).
 - Documentação dividida em README e `docs/` (requisitos, arquitetura, hardware e mapa de pinos).
 - Requisitos de segurança RF14 (saídas desligadas no boot), RF15 (watchdog) e RF16 (senha e autenticação na página web).
