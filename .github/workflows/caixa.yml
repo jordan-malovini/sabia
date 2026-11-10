@@ -19,13 +19,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Instalar OpenSCAD
         run: sudo apt-get update -q && sudo apt-get install -y -q openscad xvfb
-      - name: Gerar STL (para de vez em qualquer aviso)
+      - name: Gerar STL (falha em qualquer aviso)
         run: |
           mkdir -p saida
           for p in base tampa; do
             openscad --hardwarnings -D "parte=\"$p\"" -o saida/sabia-caixa-$p.stl caixa.scad 2>&1 | tee saida/log-$p.txt
           done
           grep -h "Caixa externa\|Área interna" saida/log-base.txt || true
+          if grep -l "2-manifold" saida/log-*.txt; then echo "::error::sólido inválido (2-manifold) no STL acima"; exit 1; fi
       - name: Conferir que os STL não estão vazios
         run: |
           for f in saida/*.stl; do
@@ -44,3 +45,10 @@ jobs:
           name: caixa-3d
           path: hardware/caixa-3d/saida/
           retention-days: 30
+      - name: Prévias no log (temporário)
+        run: |
+          for p in montagem aberta base tampa; do
+            xvfb-run -a openscad -D "parte=\"$p\"" --render --viewall --autocenter --imgsize=900,700 \
+              --colorscheme=Tomorrow -o /tmp/p-$p.png caixa.scad >/dev/null 2>&1
+            echo "PREVIA-INICIO $p"; base64 -w0 /tmp/p-$p.png; echo; echo "PREVIA-FIM $p"
+          done

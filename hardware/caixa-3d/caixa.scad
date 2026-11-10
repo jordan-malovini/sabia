@@ -172,7 +172,8 @@ module base() {
         berco(p_sd, sd);
       }
       // ressaltos dos parafusos de fechamento
-      for (f = fech) translate([f[0], f[1], 0]) cylinder(d = 8, h = P - 3.5);
+      // d = 9: invade 0,5 mm a parede (tangente gera sólido inválido)
+      for (f = fech) translate([f[0], f[1], 0]) cylinder(d = 9, h = P - 3.5);
       abas_parede();
       dobradica_base();
     }
