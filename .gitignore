@@ -1,0 +1,24 @@
+# Credenciais (Wi-Fi, senha da página, URL do Apps Script)
+firmware/include/secrets.h
+
+# Build do PlatformIO e do Arduino
+.pio/
+build/
+*.elf
+*.map
+
+# Editores e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Python (ferramentas de análise)
+__pycache__/
+*.pyc
+.venv/
+
+# Dados exportados do controlador
+*.log
+dados/

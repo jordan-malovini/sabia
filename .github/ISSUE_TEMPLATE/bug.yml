@@ -1,0 +1,30 @@
+name: Bug
+description: Algo que não funcionou como deveria
+labels: ["bug"]
+body:
+  - type: textarea
+    id: aconteceu
+    attributes:
+      label: O que aconteceu
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que era esperado
+  - type: textarea
+    id: reproduzir
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. ...
+        2. ...
+  - type: input
+    id: versao
+    attributes:
+      label: Versão do firmware e revisão do hardware
+      placeholder: "v0.2, Rev A"
+  - type: textarea
+    id: anexos
+    attributes:
+      label: Log serial, fotos ou prints

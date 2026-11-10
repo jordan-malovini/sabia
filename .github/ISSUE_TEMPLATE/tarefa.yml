@@ -1,0 +1,22 @@
+name: Tarefa
+description: Uma tarefa pequena do roteiro (firmware, hardware ou documentação)
+labels: ["tarefa"]
+body:
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: O que fazer
+      description: Descreva a tarefa em poucas linhas.
+    validations:
+      required: true
+  - type: textarea
+    id: pronto
+    attributes:
+      label: Quando está pronta
+      description: Como saber que terminou (o teste que precisa passar).
+      placeholder: "- [ ] ..."
+  - type: input
+    id: requisito
+    attributes:
+      label: Requisito relacionado
+      placeholder: "RF03"
