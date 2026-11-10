@@ -55,6 +55,8 @@ lcd_janela  = [74, 42];   // área visível (72 x 40) + 1 mm de cada lado
 lcd_moldura = 8.9;        // MEDIR: da frente da moldura até a frente da placa
                           // (o desenho dá 10,5 até as costas da placa de 1,6)
 
+acrilico  = [80, 48, 1.2]; // rebaixo para o visor de acrílico de 1 mm (corte 79,5 x 47,5)
+
 d_encoder = 7.5;          // furo do encoder (eixo roscado M7, tipo EC11)
 
 // Passa-cabos (prensa-cabos): diâmetros dos furos
@@ -245,6 +247,9 @@ module tampa() {
     translate([lcd_c[0], lcd_c[1], P + t - 1])
       linear_extrude(height = 1.01, scale = [(lcd_janela[0] + 2) / lcd_janela[0], (lcd_janela[1] + 2) / lcd_janela[1]])
         square(lcd_janela, center = true);
+    // rebaixo do visor de acrílico, por dentro (a moldura da tela prende a placa)
+    translate([lcd_c[0], lcd_c[1], P - 1])
+      linear_extrude(height = acrilico[2] + 1) square([acrilico[0], acrilico[1]], center = true);
     // furos dos parafusos da tela (M2.5 entram por trás da placa)
     for (sx = [-1, 1], sy = [-1, 1])
       translate([lcd_c[0] + sx * lcd_furos[0] / 2, lcd_c[1] + sy * lcd_furos[1] / 2, P - lcd_moldura - 1])
