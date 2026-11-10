@@ -1,0 +1,64 @@
+name: Firmware
+
+on:
+  push:
+    branches: [main]
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  pull_request:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  workflow_dispatch:
+
+jobs:
+  testes:
+    name: Testes no computador
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+          key: pio-native-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Instalar PlatformIO
+        run: pip install platformio
+      - name: Rodar testes
+        run: pio test -e native
+
+  compilar:
+    name: Compilar (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [esp32s3, esp32s3-n16r8]
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio
+          key: pio-esp32-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Instalar PlatformIO
+        run: pip install platformio
+      - name: Compilar
+        run: pio run -e ${{ matrix.env }}
+      - name: Guardar o firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.env }}
+          path: firmware/.pio/build/${{ matrix.env }}/firmware.bin
+          retention-days: 14
