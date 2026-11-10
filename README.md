@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo/sabia-horizontal.png" alt="SABIÁ" width="520"></p>
+<p align="center"><img src="assets/logo/sabia-galho.png" alt="SABIÁ" width="460"></p>
 
 # SABIÁ
 

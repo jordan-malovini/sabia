@@ -2,8 +2,8 @@
 
 | Arquivo | Uso |
 | --- | --- |
-| `sabia-horizontal.png` | Logo principal: pássaro e nome lado a lado (README, documentos) |
-| `sabia-galho.png` | Variação com o pássaro pousado sobre o nome |
+| `sabia-horizontal.png` | Pássaro e nome lado a lado (documentos, apresentações) |
+| `sabia-galho.png` | Logo principal: pássaro pousado sobre o nome (README) |
 | `sabia-passaro.png` | Só o pássaro (símbolo) |
 | `sabia-icone-512.png` | Ícone quadrado (favicon, perfil do repositório) |
 
