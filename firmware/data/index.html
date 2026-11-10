@@ -25,7 +25,7 @@ h1,h2,h3,p{margin:0}
 /* Estrutura: celular primeiro */
 .app{min-height:100vh;display:flex;flex-direction:column}
 .lateral{display:none}
-.conteudo{flex:1;padding:16px 16px 96px;max-width:1180px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.conteudo{flex:1;padding:max(16px, env(safe-area-inset-top)) 16px 96px;max-width:1180px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:16px}
 .topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .marca{font-size:22px;font-weight:700;letter-spacing:.5px}
 .navinferior{position:fixed;left:0;right:0;bottom:0;display:flex;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));
