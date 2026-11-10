@@ -28,6 +28,7 @@ const ok = (cond, msg) => { if (!cond) falhas++; console.log((cond ? "ok   " : "
 const clicar = sel => ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)}); if(!e) throw new Error("elemento nao encontrado"); e.click(); return true})()`);
 
 ok(await ev(`!document.querySelector('#faixaDemo').classList.contains('oculto')`), "modo demonstração ativo");
+ok(await ev(`document.querySelector('.topo').getBoundingClientRect().top >= 0 && scrollY === 0`), "abre no topo, com o cabeçalho visível");
 ok((await ev(`document.querySelectorAll('#listaSetores .setor').length`)) === 4, "celular mostra 4 setores");
 await clicar('#verTodos'); await espera(200);
 ok((await ev(`document.querySelectorAll('#listaSetores .setor').length`)) === 8, "ver todos mostra 8");

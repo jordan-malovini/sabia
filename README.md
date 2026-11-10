@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo/sabia-galho.png" alt="SABIÁ" width="460"></p>
+
 # SABIÁ
 
 **Sistema Automático de Balanço e Irrigação Agrícola**
@@ -79,7 +81,7 @@ sabia/
 ├── hardware/      esquemáticos, PCB, caixa 3D e lista de materiais
 ├── tests/         roteiros de bancada e simulação no Wokwi
 ├── tools/         Apps Script e análise em Python
-└── assets/        fotos e esboços
+└── assets/        logo, fotos e esboços
 ```
 
 ## Versionamento
