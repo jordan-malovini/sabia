@@ -1,0 +1,1104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2F6B4F">
+<title>SABIÁ</title>
+<style>
+:root{
+  --fundo:#F6F4EE; --cartao:#FFFFFF; --texto:#1B2A22; --suave:#55635B; --borda:#DDD8C9;
+  --trilho:#E6E2D6; --destaque:#2F6B4F; --destaque-escuro:#1F4D38; --chip:#E3EFE8;
+  --agua:#2B6CA3; --calor:#B7791F; --alerta:#B54708; --alerta-fundo:#FEF0C7;
+  --erro:#B42318; --erro-fundo:#FEE4E2; --raio:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fundo);color:var(--texto);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.35}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,p{margin:0}
+.oculto{display:none!important}
+.suave{color:var(--suave)}
+.pequeno{font-size:12px}
+
+/* Estrutura: celular primeiro */
+.app{min-height:100vh;display:flex;flex-direction:column}
+.lateral{display:none}
+.conteudo{flex:1;padding:16px 16px 96px;max-width:1180px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.marca{font-size:22px;font-weight:700;letter-spacing:.5px}
+.navinferior{position:fixed;left:0;right:0;bottom:0;display:flex;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  background:var(--cartao);border-top:1px solid var(--borda);z-index:20}
+.navinferior a,.lateral a{flex:1;text-align:center;min-height:44px;line-height:44px;border-radius:10px;
+  text-decoration:none;color:var(--suave);font-size:14px}
+.navinferior a.ativo,.lateral a.ativo{background:var(--chip);color:var(--destaque-escuro);font-weight:600}
+
+@media (min-width:900px){
+  .app{flex-direction:row}
+  .lateral{display:flex;flex-direction:column;gap:6px;width:220px;padding:24px 14px;background:var(--cartao);
+    border-right:1px solid var(--borda);position:sticky;top:0;height:100vh}
+  .lateral .marca{margin:0 12px 2px}
+  .lateral a{text-align:left;padding:0 12px;flex:none}
+  .navinferior{display:none}
+  .conteudo{padding:28px 32px}
+  .topo .marca{display:none}
+}
+
+/* Elementos */
+.cartao{background:var(--cartao);border-radius:var(--raio);padding:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:6px 10px;border-radius:999px;
+  background:var(--chip);color:var(--destaque-escuro);border:0;min-height:32px}
+.chip .ponto{width:8px;height:8px;border-radius:50%;background:currentColor}
+.chip.alerta{background:var(--alerta-fundo);color:var(--alerta)}
+.chip.erro{background:var(--erro-fundo);color:var(--erro)}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:0;background:var(--destaque);color:#fff;font-weight:600;font-size:14px}
+.btn.claro{background:#fff;color:var(--destaque-escuro)}
+.btn.contorno{background:transparent;border:2px solid var(--destaque);color:var(--destaque)}
+.btn.contorno-branco{background:transparent;border:2px solid #fff;color:#fff}
+.btn.perigo{background:var(--erro)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.bloqueado{opacity:.55}
+.barra{height:6px;border-radius:3px;background:var(--trilho);overflow:hidden}
+.barra>div{height:100%;border-radius:3px;background:var(--agua)}
+.titulo-secao{font-size:16px;font-weight:600}
+
+/* Painel */
+.destaque{background:var(--destaque);color:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.destaque .barra{height:8px;background:rgba(255,255,255,.3)}
+.destaque .barra>div{background:#fff}
+.destaque .acoes{display:flex;gap:8px}
+.destaque .acoes .btn{flex:1}
+.destaque.parado{background:var(--cartao);color:var(--texto)}
+.bomba{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.18)}
+.bomba .ponto{width:8px;height:8px;border-radius:50%;background:#9BE3B5}
+.bomba.desligada .ponto{background:rgba(255,255,255,.5)}
+.fila{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.fila .item{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.18);border-radius:999px;padding:2px 4px 2px 10px}
+.fila .item button{border:0;background:transparent;color:#fff;width:28px;height:28px;border-radius:50%;font-size:16px;line-height:1}
+.numeros{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.numero .valor{font-size:26px;font-weight:600;margin-top:4px}
+.numero .valor span{font-size:14px;font-weight:400;color:var(--suave)}
+@media (min-width:900px){
+  .numeros{grid-template-columns:repeat(4,1fr)}
+  .destaque{flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px 24px;padding:18px 20px}
+  .destaque .info{flex:1 1 360px}
+  .destaque .acoes{flex:0 0 auto}
+  .destaque .acoes .btn{flex:none;padding:0 18px}
+  .destaque .fila{flex-basis:100%}
+}
+.setores{display:grid;gap:10px}
+@media (min-width:900px){.setores{grid-template-columns:1fr 1fr}}
+.setor{display:flex;align-items:center;gap:12px;border:2px solid transparent}
+.setor.regando{border-color:var(--destaque)}
+.setor.inativo{opacity:.6}
+.setor .corpo{flex:1;min-width:0}
+.setor .nome{font-weight:600;font-size:15px;background:none;border:0;padding:0;text-align:left}
+.setor .situacao{font-size:12px;color:var(--suave);margin:2px 0 8px}
+.setor.regando .situacao{color:var(--destaque-escuro)}
+.setor .btn{min-width:84px}
+
+/* Histórico */
+.periodos{display:flex;gap:6px}
+.periodos button{flex:1;min-height:40px;border-radius:10px;border:1px solid var(--borda);background:#fff}
+.periodos button.ativo{background:var(--chip);border-color:var(--chip);color:var(--destaque-escuro);font-weight:600}
+.graficos{display:grid;gap:12px}
+@media (min-width:900px){.graficos{grid-template-columns:1fr 1fr}}
+.grafico h3{font-size:15px;font-weight:600;margin-bottom:8px}
+.grafico svg{width:100%;height:auto;display:block}
+.legenda{display:flex;gap:14px;font-size:12px;color:var(--suave);margin-top:6px}
+.legenda i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--trilho)}
+th{color:var(--suave);font-weight:500}
+td.num,th.num{text-align:right}
+.eventos li{padding:8px 0;border-bottom:1px solid var(--trilho);font-size:13px;list-style:none;display:flex;gap:10px}
+.eventos{padding:0;margin:0}
+.eventos time{color:var(--suave);white-space:nowrap;min-width:92px}
+.downloads{display:flex;flex-wrap:wrap;gap:8px}
+.downloads .btn{flex:1 1 140px}
+
+/* Ajustes */
+details.grupo{background:var(--cartao);border-radius:var(--raio)}
+details.grupo>summary{list-style:none;cursor:pointer;padding:14px;min-height:52px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
+details.grupo>summary::-webkit-details-marker{display:none}
+details.grupo>summary::after{content:"›";font-size:22px;color:var(--suave);transform:rotate(90deg);transition:transform .15s}
+details.grupo[open]>summary::after{transform:rotate(-90deg)}
+details.grupo>summary small{font-weight:400;color:var(--suave);font-size:12px;margin-left:8px}
+.campos{padding:0 14px 14px;display:grid;gap:14px}
+.campo{display:grid;gap:6px}
+.campo>label,.campo>.rotulo{font-size:13px;font-weight:600}
+.ajuda{font-size:12px;color:var(--suave)}
+.campos input:disabled,.campos select:disabled{background:#F1EFE8;color:var(--suave)}
+.campo input[type=text],.campo input[type=password],.campo input[type=number],.campo input[type=time],.campo select{
+  min-height:44px;border:1px solid var(--borda);border-radius:10px;padding:0 12px;background:#fff;width:100%}
+.campo input:focus,.campo select:focus{outline:2px solid var(--destaque);outline-offset:1px}
+.campo input:invalid{border-color:var(--erro)}
+.unidade{display:flex;align-items:center;gap:8px}
+.unidade span{color:var(--suave);font-size:13px;white-space:nowrap}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.segmentado{display:flex;border:1px solid var(--borda);border-radius:10px;overflow:hidden}
+.segmentado button{flex:1;min-height:44px;border:0;background:#fff}
+.segmentado button.ativo{background:var(--destaque);color:#fff;font-weight:600}
+.interruptor{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px}
+.interruptor input{appearance:none;width:48px;height:28px;border-radius:999px;background:var(--trilho);position:relative;flex:none;cursor:pointer}
+.interruptor input::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s}
+.interruptor input:checked{background:var(--destaque)}
+.interruptor input:checked::after{left:23px}
+.dias{display:flex;gap:4px}
+.dias button{flex:1;min-height:40px;border-radius:8px;border:1px solid var(--borda);background:#fff;font-size:13px}
+.dias button.ativo{background:var(--chip);border-color:var(--destaque);color:var(--destaque-escuro);font-weight:600}
+.horarios{display:flex;flex-wrap:wrap;gap:8px}
+.horarios .h{display:flex;align-items:center;gap:4px;border:1px solid var(--borda);border-radius:10px;padding:0 4px 0 8px;background:#fff}
+.horarios .h input{border:0;min-height:40px;width:auto;padding:0}
+.horarios .h button{border:0;background:none;width:32px;height:32px;font-size:18px;color:var(--suave)}
+.aviso{font-size:13px;padding:10px 12px;border-radius:10px;background:var(--alerta-fundo);color:var(--alerta)}
+.aviso.erro{background:var(--erro-fundo);color:var(--erro)}
+.subsetor{border:1px solid var(--trilho);border-radius:10px}
+.subsetor>summary{padding:12px;min-height:48px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none}
+.subsetor>summary::-webkit-details-marker{display:none}
+.subsetor .campos{padding:0 12px 12px}
+.barra-salvar{position:fixed;left:0;right:0;bottom:calc(61px + env(safe-area-inset-bottom));z-index:15;display:flex;gap:8px;align-items:center;
+  padding:10px 16px;background:var(--texto);color:#fff}
+.barra-salvar p{flex:1;font-size:13px}
+.barra-salvar .btn{min-height:40px}
+@media (min-width:900px){.barra-salvar{left:220px;bottom:0}}
+
+/* Diálogos e avisos */
+dialog{border:0;border-radius:16px;padding:20px;width:min(420px,calc(100vw - 32px));color:var(--texto)}
+dialog::backdrop{background:rgba(27,42,34,.45)}
+dialog h2{font-size:18px;margin-bottom:6px}
+dialog .acoes-dialogo{display:flex;gap:8px;margin-top:18px}
+dialog .acoes-dialogo .btn{flex:1}
+.passo{display:flex;align-items:center;gap:8px}
+.passo button{width:48px;height:48px;border-radius:10px;border:1px solid var(--borda);background:#fff;font-size:22px}
+.passo input{flex:1;text-align:center;font-size:24px;font-weight:600;min-height:48px;border:1px solid var(--borda);border-radius:10px}
+.status-lista{display:grid;gap:10px;margin-top:10px}
+.status-lista div{display:flex;justify-content:space-between;gap:12px;font-size:14px;border-bottom:1px solid var(--trilho);padding-bottom:8px}
+.toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--texto);color:#fff;
+  padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;max-width:calc(100vw - 32px)}
+.desatualizado .conteudo>section,.desatualizado .conteudo>.paginas{filter:grayscale(1);opacity:.6}
+.faixa-demo{font-size:12px;text-align:center;padding:6px;background:var(--alerta-fundo);color:var(--alerta)}
+</style>
+</head>
+<body>
+<div id="faixaDemo" class="faixa-demo oculto">Modo demonstração: valores simulados, nada é enviado ao controlador. Para entrar, use qualquer senha.</div>
+<div class="app" id="app">
+  <nav class="lateral" aria-label="Navegação">
+    <p class="marca">SABIÁ</p>
+    <p class="suave pequeno" style="margin:0 12px 12px">Irrigação automática</p>
+    <a href="#painel" data-pagina="painel">Painel</a>
+    <a href="#historico" data-pagina="historico">Histórico</a>
+    <a href="#ajustes" data-pagina="ajustes">Ajustes</a>
+  </nav>
+
+  <main class="conteudo">
+    <header class="topo">
+      <div>
+        <h1 class="marca">SABIÁ</h1>
+        <h2 id="tituloPagina" class="titulo-secao oculto" style="font-size:24px">Painel</h2>
+        <p class="suave pequeno" id="relogio">–</p>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <button class="chip" id="chipStatus" type="button"><span class="ponto"></span><span id="textoStatus">Conectando…</span></button>
+        <button class="chip" id="chipSessao" type="button">Entrar</button>
+      </div>
+    </header>
+
+    <div class="paginas">
+      <!-- PAINEL -->
+      <section id="painel" class="pagina" style="display:flex;flex-direction:column;gap:16px">
+        <section id="destaque" class="destaque" aria-live="polite"></section>
+        <section class="numeros" id="numeros"></section>
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <h2 class="titulo-secao">Setores</h2>
+          <button class="btn contorno" id="btnCiclo" style="min-height:36px;padding:0 12px;font-size:13px">Iniciar ciclo</button>
+        </div>
+        <div class="setores" id="listaSetores"></div>
+      </section>
+
+      <!-- HISTÓRICO -->
+      <section id="historico" class="pagina oculto" style="display:flex;flex-direction:column;gap:16px">
+        <div class="periodos" id="periodos">
+          <button data-p="hoje" class="ativo">Hoje</button>
+          <button data-p="7d">7 dias</button>
+          <button data-p="30d">30 dias</button>
+        </div>
+        <div class="graficos" id="graficos"></div>
+        <div class="cartao">
+          <h3 class="titulo-secao" style="margin-bottom:8px">Regas no período</h3>
+          <table id="tabelaRegas"></table>
+        </div>
+        <div class="cartao">
+          <h3 class="titulo-secao" style="margin-bottom:4px">Eventos</h3>
+          <ul class="eventos" id="eventos"></ul>
+        </div>
+        <div class="cartao">
+          <h3 class="titulo-secao" style="margin-bottom:8px">Baixar dados (CSV)</h3>
+          <div class="downloads">
+            <button class="btn contorno" data-csv="chuva">Chuva</button>
+            <button class="btn contorno" data-csv="clima">Clima</button>
+            <button class="btn contorno" data-csv="regas">Regas</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- AJUSTES -->
+      <section id="ajustes" class="pagina oculto" style="display:flex;flex-direction:column;gap:10px">
+        <p id="avisoLeitura" class="aviso oculto">Entre com a senha para alterar os ajustes.</p>
+        <div id="formAjustes" style="display:flex;flex-direction:column;gap:10px"></div>
+      </section>
+    </div>
+  </main>
+
+  <nav class="navinferior" aria-label="Navegação">
+    <a href="#painel" data-pagina="painel">Painel</a>
+    <a href="#historico" data-pagina="historico">Histórico</a>
+    <a href="#ajustes" data-pagina="ajustes">Ajustes</a>
+  </nav>
+</div>
+
+<div class="barra-salvar oculto" id="barraSalvar">
+  <p id="textoSalvar">Alterações não salvas</p>
+  <button class="btn contorno-branco" id="btnDescartar">Descartar</button>
+  <button class="btn claro" id="btnSalvar">Salvar</button>
+</div>
+
+<!-- Diálogos -->
+<dialog id="dlgLigar">
+  <h2 id="dlgLigarTitulo">Ligar setor</h2>
+  <p class="suave pequeno" id="dlgLigarInfo"></p>
+  <div class="passo" style="margin-top:14px">
+    <button type="button" data-passo="-5" aria-label="Menos 5 minutos">−</button>
+    <input type="number" id="dlgLigarMin" min="1" max="240" inputmode="numeric" aria-label="Duração em minutos">
+    <button type="button" data-passo="5" aria-label="Mais 5 minutos">+</button>
+  </div>
+  <p class="suave pequeno" style="text-align:center;margin-top:6px">minutos</p>
+  <div class="acoes-dialogo">
+    <button class="btn contorno" value="cancelar" data-fechar>Cancelar</button>
+    <button class="btn" id="dlgLigarOk">Ligar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgConfirmar">
+  <h2 id="dlgConfirmarTitulo"></h2>
+  <p class="suave" id="dlgConfirmarTexto"></p>
+  <div class="acoes-dialogo">
+    <button class="btn contorno" data-fechar>Cancelar</button>
+    <button class="btn perigo" id="dlgConfirmarOk">Confirmar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgEntrar">
+  <h2>Entrar</h2>
+  <p class="suave pequeno">Sem entrar, dá para ver o painel, mas não ligar, parar ou alterar ajustes.</p>
+  <div class="campo" style="margin-top:14px">
+    <label for="senhaEntrar">Senha</label>
+    <input type="password" id="senhaEntrar" autocomplete="current-password">
+    <p class="ajuda oculto" id="erroEntrar" style="color:var(--erro)">Senha incorreta.</p>
+  </div>
+  <div class="acoes-dialogo">
+    <button class="btn contorno" data-fechar>Cancelar</button>
+    <button class="btn" id="btnEntrarOk">Entrar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgStatus">
+  <h2>Estado do sistema</h2>
+  <div class="status-lista" id="listaStatus"></div>
+  <div class="acoes-dialogo"><button class="btn contorno" data-fechar>Fechar</button></div>
+</dialog>
+
+<div class="toast oculto" id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   SABIÁ - página web local
+   Tenta a API do controlador (/api/...). Se não houver controlador
+   (arquivo aberto no PC, prévia), entra em modo demonstração.
+   Contrato da API: docs/api.md
+   ===================================================================== */
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const DIAS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const DIAS_NOME = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const LIMITE_DESATUALIZADO_S = 30;
+const num = (v, casas = 1) => Number(v).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+const minutos = s => Math.max(0, Math.ceil(s / 60));
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ---------------------------------------------------------------------
+   Configuração padrão (a mesma estrutura de GET/PUT /api/config)
+   --------------------------------------------------------------------- */
+function configPadrao() {
+  const setores = [];
+  for (let i = 1; i <= 8; i++) {
+    const aspersao = i % 2 === 0;
+    setores.push({
+      nome: `Setor ${i}`, ativo: true, tipo: aspersao ? "aspersao" : "gotejo",
+      duracaoMin: aspersao ? 40 : 35,
+      horarios: [aspersao ? ["04:00", "04:45", "05:30", "06:15"][i / 2 - 1] : ["20:00", "20:40", "21:20", "22:00"][(i - 1) / 2]], dias: [1, 1, 1, 1, 1, 1, 1],
+      kc: 1.0, taxaMmH: aspersao ? 6 : 2.5, eficienciaPct: aspersao ? 80 : 90,
+      deficitMinMm: aspersao ? 8 : 3, tempoMaxMin: aspersao ? 90 : 60,
+      janela: aspersao ? ["04:00", "08:00"] : ["00:00", "23:59"], fator: 1.0,
+    });
+  }
+  return {
+    modo: "individual", balancoHidrico: true, adiarPorChuva: true, chuvaAdiarMm: 5,
+    ciclo: { inicio: "05:30", dias: [1, 1, 1, 1, 1, 1, 1] },
+    bomba: { usar: true, atrasoLigarS: 2, atrasoFecharS: 1, pausaEntreSetoresS: 3 },
+    setores,
+    estacao: { mmPorBasculada: 0.2, chuvaEfetivaMinMm: 2, capacidadeSoloMm: 40, latitude: null, ajusteTempC: 0 },
+    relogio: { ntp: true, fuso: "America/Sao_Paulo" },
+    rede: { wifiNome: "", wifiSenha: "", apNome: "SABIA", apSenha: "", apSempre: false },
+    registro: { drive: false, driveUrl: "", envioHoras: 24, diasNoCartao: 7 },
+    display: { luzSegundos: 60, travarComandos: false },
+    seguranca: { sessaoMin: 30 },
+  };
+}
+
+/* ---------------------------------------------------------------------
+   Modo demonstração: simula o controlador no navegador
+   --------------------------------------------------------------------- */
+const demo = {
+  config: configPadrao(),
+  t0: Date.now(),
+  atual: { setor: 4, fase: "regando", restanteS: 12 * 60, duracaoS: 40 * 60, origem: "ciclo" },
+  fila: [{ setor: 5, duracaoS: 30 * 60 }, { setor: 6, duracaoS: 40 * 60 }, { setor: 7, duracaoS: 35 * 60 }, { setor: 8, duracaoS: 40 * 60 }],
+  saldo: [62, 38, 80, 15, 71, 45, 55, 28],
+  adiado: { 3: "amanhã, 20:00" },
+  logado: false,
+  eventos: [
+    ["sáb 14:20", "Setor 4 iniciou (ciclo, 40 min)"],
+    ["sáb 13:05", "Chuva começou"],
+    ["sáb 06:10", "Setor 3 adiado por chuva (12 mm em 24 h)"],
+    ["sex 20:35", "Setor 1 terminou (35 min)"],
+    ["sex 03:12", "Energia voltou; nenhuma rega retomada"],
+  ],
+  tick() {
+    const a = this.atual;
+    if (!a) {
+      if (this.fila.length) { const p = this.fila.shift(); this.atual = { setor: p.setor, fase: "abrindo", restanteS: p.duracaoS, duracaoS: p.duracaoS, origem: "fila", faseS: 2 }; }
+      return;
+    }
+    if (a.fase === "abrindo" && --a.faseS <= 0) a.fase = "regando";
+    else if (a.fase === "regando") { a.restanteS -= 1; if (a.restanteS <= 0) { a.fase = "fechando"; a.faseS = 1; } }
+    else if (a.fase === "fechando" && --a.faseS <= 0) { a.fase = "pausa"; a.faseS = 3; }
+    else if (a.fase === "pausa" && --a.faseS <= 0) {
+      this.saldo[a.setor - 1] = Math.min(100, this.saldo[a.setor - 1] + 50);
+      this.atual = null; this.tick();
+    }
+  },
+  estado() {
+    const agora = new Date();
+    const a = this.atual;
+    const pendente = a ? [a.setor] : [];
+    return {
+      versao: "0.1-demo", hora: agora.toISOString(),
+      sistema: { wifi: true, ip: "192.168.0.50", modoAp: false, cartaoSd: { ok: true, usoPct: 12 },
+        drive: { ativo: this.config.registro.drive, ultimoEnvio: "ontem, 23:00" }, rtc: true, ligadoHa: Math.round((Date.now() - this.t0) / 1000) + 86400 * 3 },
+      sessao: { logado: this.logado },
+      modo: this.config.modo,
+      atual: a ? { setor: a.setor, fase: a.fase, restanteS: a.restanteS, duracaoS: a.duracaoS, bomba: a.fase === "regando", origem: a.origem } : null,
+      fila: this.fila.map(p => ({ ...p })),
+      proximaRega: { setor: 5, hora: "20:00" },
+      clima: { chuvaHojeMm: 4.2, chuvaMesMm: 86, tempC: 27.5, tempMaxC: 31.2, tempMinC: 21.4, et0HojeMm: 4.6 },
+      setores: this.config.setores.map((s, i) => ({
+        saldoPct: this.saldo[i],
+        proxima: this.adiado[i + 1] ? null : `${s.horarios[0] || "–"} · ${s.duracaoMin} min`,
+        adiadoAte: this.adiado[i + 1] || null,
+        pendente: pendente.includes(i + 1),
+      })),
+    };
+  },
+  comando(c) {
+    if (!this.logado) throw new Error("Entre para enviar comandos");
+    if (c.acao === "ligar") {
+      if (this.atual && this.atual.setor === c.setor) throw new Error("Esse setor já está regando");
+      if (this.fila.some(p => p.setor === c.setor)) throw new Error("Esse setor já está na fila");
+      this.fila.push({ setor: c.setor, duracaoS: c.minutos * 60 });
+      if (!this.atual) this.tick();
+    } else if (c.acao === "pular") {
+      if (this.atual && this.atual.fase !== "pausa") { this.atual.fase = "fechando"; this.atual.faseS = 1; }
+    } else if (c.acao === "parar") {
+      if (this.atual && this.atual.setor === c.setor) { this.atual.fase = "fechando"; this.atual.faseS = 1; }
+      else this.fila = this.fila.filter(p => p.setor !== c.setor);
+    } else if (c.acao === "pararTudo") {
+      this.fila = [];
+      if (this.atual && this.atual.fase !== "pausa") { this.atual.fase = "fechando"; this.atual.faseS = 1; }
+    } else if (c.acao === "ciclo") {
+      this.config.setores.forEach((s, i) => {
+        const n = i + 1;
+        if (s.ativo && !(this.atual && this.atual.setor === n) && !this.fila.some(p => p.setor === n)) this.fila.push({ setor: n, duracaoS: s.duracaoMin * 60 });
+      });
+      if (!this.atual) this.tick();
+    }
+    return { ok: true };
+  },
+  historico(periodo) {
+    const rnd = semente => { let x = semente; return () => (x = (x * 9301 + 49297) % 233280) / 233280; };
+    const r = rnd(periodo.length * 7 + 3);
+    if (periodo === "hoje") {
+      const chuva = Array.from({ length: 24 }, (_, h) => (h >= 13 && h <= 16 ? [0.6, 2.2, 1.0, 0.4][h - 13] : 0));
+      const temp = Array.from({ length: 24 }, (_, h) => 22 + 9 * Math.max(0, Math.sin((h - 6) / 24 * 2 * Math.PI)) + r());
+      return { rotulos: Array.from({ length: 24 }, (_, h) => `${h}h`), chuvaMm: chuva, tempMaxC: temp, tempMinC: null, et0Mm: null };
+    }
+    const n = periodo === "7d" ? 7 : 30;
+    const hoje = new Date();
+    const rotulos = Array.from({ length: n }, (_, i) => {
+      const d = new Date(hoje); d.setDate(d.getDate() - (n - 1 - i));
+      return n === 7 ? DIAS_NOME[d.getDay()] : `${d.getDate()}`;
+    });
+    const chuvaMm = rotulos.map(() => (r() < 0.35 ? Math.round(r() * 140) / 10 : 0));
+    const tempMaxC = rotulos.map(() => 28 + r() * 5);
+    const tempMinC = rotulos.map(() => 19 + r() * 3);
+    const et0Mm = rotulos.map((_, i) => 3.2 + r() * 2 - (chuvaMm[i] > 0 ? 1 : 0));
+    return { rotulos, chuvaMm, tempMaxC, tempMinC, et0Mm };
+  },
+  regas(periodo) {
+    const f = periodo === "hoje" ? 1 : periodo === "7d" ? 6 : 24;
+    return this.config.setores.map((s, i) => ({ setor: i + 1, nome: s.nome, vezes: Math.round(f * (s.tipo === "gotejo" ? 1 : 0.6)), minutos: Math.round(f * s.duracaoMin * (0.7 + (i % 3) * 0.1)) }));
+  },
+};
+
+/* ---------------------------------------------------------------------
+   Acesso ao controlador
+   --------------------------------------------------------------------- */
+const api = {
+  modoDemo: false,
+  async iniciar() {
+    if (location.protocol === "file:") { this.modoDemo = true; return; }
+    try {
+      const r = await fetch("/api/estado", { cache: "no-store" });
+      if (!r.ok) throw 0;
+      await r.json();
+    } catch { this.modoDemo = true; }
+  },
+  async req(caminho, opcoes = {}) {
+    const r = await fetch(caminho, { cache: "no-store", headers: { "Content-Type": "application/json" }, ...opcoes });
+    if (r.status === 401) { estadoApp.logado = false; throw new Error("Entre para enviar comandos"); }
+    if (!r.ok) throw new Error((await r.text()) || `Erro ${r.status}`);
+    return r.json();
+  },
+  async estado() { return this.modoDemo ? demo.estado() : this.req("/api/estado"); },
+  async config() { return this.modoDemo ? structuredClone(demo.config) : this.req("/api/config"); },
+  async salvarConfig(c) {
+    if (this.modoDemo) { if (!demo.logado) throw new Error("Entre para salvar"); demo.config = structuredClone(c); return { ok: true }; }
+    return this.req("/api/config", { method: "PUT", body: JSON.stringify(c) });
+  },
+  async comando(c) { return this.modoDemo ? demo.comando(c) : this.req("/api/comando", { method: "POST", body: JSON.stringify(c) }); },
+  async historico(p) {
+    if (this.modoDemo) return { ...demo.historico(p), regas: demo.regas(p), eventos: demo.eventos };
+    return this.req(`/api/historico?periodo=${p}`);
+  },
+  async entrar(senha) {
+    if (this.modoDemo) { if (!senha) throw new Error("Digite a senha"); demo.logado = true; return { ok: true }; }
+    return this.req("/api/sessao", { method: "POST", body: JSON.stringify({ senha }) });
+  },
+  async sair() { if (this.modoDemo) { demo.logado = false; return; } return this.req("/api/sessao", { method: "DELETE" }); },
+  csvUrl(tipo, periodo) { return `/api/csv?tipo=${tipo}&periodo=${periodo}`; },
+};
+
+/* ---------------------------------------------------------------------
+   Estado da página
+   --------------------------------------------------------------------- */
+const estadoApp = {
+  estado: null, config: null, rascunho: null, sujo: false,
+  ultimaAtualizacao: 0, logado: false, periodo: "hoje", pagina: "painel",
+  mostrarTodos: false,
+};
+
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.remove("oculto");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("oculto"), 2600);
+}
+
+function exigirLogin() {
+  if (estadoApp.logado) return true;
+  abrirEntrar(); return false;
+}
+
+async function enviar(cmd, msgOk) {
+  if (!exigirLogin()) return;
+  try { await api.comando(cmd); if (msgOk) toast(msgOk); await atualizar(); }
+  catch (e) { toast(e.message || "Não foi possível enviar"); }
+}
+
+/* ---------------------------------------------------------------------
+   Navegação
+   --------------------------------------------------------------------- */
+const TITULOS = { painel: "Painel", historico: "Histórico", ajustes: "Ajustes" };
+function irPara(pagina) {
+  if (!TITULOS[pagina]) pagina = "painel";
+  estadoApp.pagina = pagina;
+  $$(".pagina").forEach(p => p.classList.toggle("oculto", p.id !== pagina));
+  $$("[data-pagina]").forEach(a => a.classList.toggle("ativo", a.dataset.pagina === pagina));
+  const t = $("#tituloPagina"); t.textContent = TITULOS[pagina];
+  t.classList.toggle("oculto", window.innerWidth < 900);
+  if (pagina === "historico") desenharHistorico();
+  if (pagina === "ajustes") desenharAjustes();
+  $("#barraSalvar").classList.toggle("oculto", !(estadoApp.sujo && pagina === "ajustes"));
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", () => irPara(location.hash.slice(1)));
+window.addEventListener("resize", () => $("#tituloPagina").classList.toggle("oculto", window.innerWidth < 900));
+
+/* ---------------------------------------------------------------------
+   Cabeçalho: relógio, estado do sistema, sessão
+   --------------------------------------------------------------------- */
+function desenharTopo() {
+  const e = estadoApp.estado;
+  const d = e ? new Date(e.hora) : new Date();
+  const dia = d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" }).replace(".", "");
+  const idade = Math.round((Date.now() - estadoApp.ultimaAtualizacao) / 1000);
+  const velho = !e || idade > LIMITE_DESATUALIZADO_S;
+  $("#relogio").textContent = `${dia} · ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` +
+    (e ? (velho ? ` · sem resposta há ${idade} s` : ` · atualizado há ${idade} s`) : "");
+  document.getElementById("app").classList.toggle("desatualizado", velho && !!e);
+
+  const chip = $("#chipStatus");
+  chip.classList.remove("alerta", "erro");
+  let texto = "Tudo certo";
+  if (!e) { texto = "Conectando…"; chip.classList.add("alerta"); }
+  else if (velho) { texto = "Sem resposta"; chip.classList.add("erro"); }
+  else if (e.sistema.modoAp) { texto = "Modo AP"; chip.classList.add("alerta"); }
+  else if (!e.sistema.cartaoSd.ok) { texto = "Cartão SD"; chip.classList.add("alerta"); }
+  else if (!e.sistema.wifi) { texto = "Sem Wi-Fi"; chip.classList.add("alerta"); }
+  $("#textoStatus").textContent = texto;
+
+  $("#chipSessao").textContent = estadoApp.logado ? "Sair" : "🔒 Entrar";
+}
+
+function abrirStatus() {
+  const e = estadoApp.estado; if (!e) return;
+  const s = e.sistema;
+  const dias = Math.floor(s.ligadoHa / 86400), horas = Math.floor((s.ligadoHa % 86400) / 3600);
+  const linhas = [
+    ["Wi-Fi", s.wifi ? `conectado · ${s.ip}` : "desconectado"],
+    ["Rede própria (AP)", s.modoAp ? "ativa" : "desligada"],
+    ["Cartão SD", s.cartaoSd.ok ? `ok · ${s.cartaoSd.usoPct}% usado` : "com problema"],
+    ["Google Drive", s.drive.ativo ? `último envio ${s.drive.ultimoEnvio}` : "desativado"],
+    ["Relógio (RTC)", s.rtc ? "ok" : "sem resposta"],
+    ["Ligado há", `${dias} d ${horas} h`],
+    ["Firmware", e.versao],
+  ];
+  $("#listaStatus").innerHTML = linhas.map(([a, b]) => `<div><span class="suave">${a}</span><span>${esc(b)}</span></div>`).join("");
+  $("#dlgStatus").showModal();
+}
+
+function abrirEntrar() {
+  $("#senhaEntrar").value = ""; $("#erroEntrar").classList.add("oculto");
+  $("#dlgEntrar").showModal(); $("#senhaEntrar").focus();
+}
+
+/* ---------------------------------------------------------------------
+   Painel
+   --------------------------------------------------------------------- */
+const FASES = { abrindo: "Abrindo válvula", regando: "Regando agora", fechando: "Fechando válvula", pausa: "Pausa entre setores" };
+const nomeSetor = n => (estadoApp.config?.setores[n - 1]?.nome) || `Setor ${n}`;
+const tipoSetor = n => (estadoApp.config?.setores[n - 1]?.tipo === "aspersao" ? "Aspersão" : "Gotejo");
+
+function desenharDestaque() {
+  const e = estadoApp.estado, el = $("#destaque");
+  const bloq = estadoApp.logado ? "" : " bloqueado";
+  if (!e.atual) {
+    el.className = "destaque parado";
+    const p = e.proximaRega;
+    el.innerHTML = `<div class="info"><p class="suave pequeno">Nada regando</p>
+      <p style="font-size:20px;font-weight:600;margin-top:2px">${p ? `Próxima: ${esc(nomeSetor(p.setor))} às ${esc(p.hora)}` : "Nenhuma rega agendada"}</p>
+      <p class="suave pequeno" style="margin-top:4px">Modo ${e.modo === "ciclo" ? "ciclo" : "individual"}</p></div>`;
+    return;
+  }
+  const a = e.atual;
+  el.className = "destaque";
+  const feito = a.duracaoS ? Math.round(100 * (a.duracaoS - a.restanteS) / a.duracaoS) : 0;
+  const filaHtml = e.fila.length
+    ? `<div class="fila"><span>A seguir:</span>${e.fila.map(p => `<span class="item">${esc(nomeSetor(p.setor))} · ${minutos(p.duracaoS)} min
+        <button aria-label="Tirar ${esc(nomeSetor(p.setor))} da fila" data-tirar="${p.setor}">×</button></span>`).join("")}</div>`
+    : `<div class="fila"><span style="opacity:.8">Fila vazia</span></div>`;
+  el.innerHTML = `
+    <div class="info">
+      <p class="pequeno">${FASES[a.fase] || a.fase}${a.origem === "ciclo" ? " · ciclo" : ""}</p>
+      <p style="font-size:20px;font-weight:600;margin:2px 0 8px">${esc(nomeSetor(a.setor))} · ${tipoSetor(a.setor)}</p>
+      <div class="barra" role="progressbar" aria-valuenow="${feito}" aria-valuemin="0" aria-valuemax="100"><div style="width:${feito}%"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px;flex-wrap:wrap">
+        <p style="font-size:13px">Faltam ${minutos(a.restanteS)} min de ${minutos(a.duracaoS)} min</p>
+        <span class="bomba${a.bomba ? "" : " desligada"}"><span class="ponto"></span>Bomba ${a.bomba ? "ligada" : "desligada"}</span>
+      </div>
+    </div>
+    <div class="acoes">
+      <button class="btn claro${bloq}" data-acao="pular">Pular setor</button>
+      <button class="btn contorno-branco${bloq}" data-acao="pararTudo">Parar tudo</button>
+    </div>
+    ${filaHtml}`;
+}
+
+function desenharNumeros() {
+  const c = estadoApp.estado.clima;
+  const card = (rot, val, un, extra = "") => `<div class="cartao numero"><p class="suave pequeno">${rot}</p>
+    <p class="valor">${val} <span>${un}</span></p>${extra}</div>`;
+  $("#numeros").innerHTML =
+    card("Chuva hoje", num(c.chuvaHojeMm), "mm") +
+    card("Temperatura", num(c.tempC), "°C", `<p class="suave pequeno">máx ${num(c.tempMaxC, 0)}° · mín ${num(c.tempMinC, 0)}°</p>`) +
+    card("Chuva no mês", num(c.chuvaMesMm, 0), "mm") +
+    card("Evaporação hoje", num(c.et0HojeMm), "mm", `<p class="suave pequeno">ET0 estimada</p>`);
+}
+
+function corSaldo(pct) {
+  // Pouca água no solo = rega em breve.
+  if (pct < 25) return "var(--erro)";
+  if (pct < 40) return "var(--alerta)";
+  return "var(--agua)";
+}
+
+function desenharSetores() {
+  const e = estadoApp.estado, cfg = estadoApp.config;
+  const ocupado = !!e.atual;
+  const pequeno = window.innerWidth < 900;
+  const limite = pequeno && !estadoApp.mostrarTodos ? 4 : 8;
+  let html = "";
+  cfg.setores.slice(0, limite).forEach((s, i) => {
+    const n = i + 1, info = e.setores[i];
+    const regando = e.atual && e.atual.setor === n;
+    const naFila = e.fila.some(p => p.setor === n);
+    let situacao = info.adiadoAte ? `Rega adiada por chuva até ${esc(info.adiadoAte)}` : `Próxima rega ${esc(info.proxima || "–")}`;
+    if (!s.ativo) situacao = "Desativado";
+    if (naFila) situacao = "Na fila";
+    if (regando) situacao = `${FASES[e.atual.fase]} · faltam ${minutos(e.atual.restanteS)} min`;
+    let botao;
+    const bloq = estadoApp.logado ? "" : " bloqueado";
+    if (regando || naFila) botao = `<button class="btn contorno${bloq}" data-parar="${n}">${regando ? "Parar" : "Tirar"}</button>`;
+    else botao = `<button class="btn${bloq}" data-ligar="${n}" ${s.ativo ? "" : "disabled"}>${ocupado ? "Pôr na fila" : "Ligar"}</button>`;
+    html += `<div class="cartao setor${regando ? " regando" : ""}${s.ativo ? "" : " inativo"}">
+      <div class="corpo">
+        <button class="nome" data-config-setor="${n}">${esc(s.nome)} · ${s.tipo === "aspersao" ? "Aspersão" : "Gotejo"}</button>
+        <p class="situacao">${situacao}</p>
+        <div class="barra"><div style="width:${info.saldoPct}%;background:${corSaldo(info.saldoPct)}"></div></div>
+        <p class="suave" style="font-size:11px;margin-top:4px">Água no solo ${info.saldoPct}%</p>
+      </div>${botao}</div>`;
+  });
+  if (limite < 8) html += `<button class="btn contorno" id="verTodos" style="background:transparent">Ver os outros 4 setores</button>`;
+  $("#listaSetores").innerHTML = html;
+}
+
+function desenharPainel() {
+  if (!estadoApp.estado || !estadoApp.config) return;
+  desenharDestaque(); desenharNumeros(); desenharSetores();
+}
+
+function abrirLigar(n) {
+  if (!exigirLogin()) return;
+  const s = estadoApp.config.setores[n - 1];
+  const ocupado = !!estadoApp.estado.atual;
+  $("#dlgLigarTitulo").textContent = `${ocupado ? "Pôr na fila" : "Ligar"}: ${s.nome}`;
+  $("#dlgLigarInfo").textContent = ocupado
+    ? `Outro setor está regando. ${s.nome} entra no fim da fila.`
+    : `${s.tipo === "aspersao" ? "Aspersão" : "Gotejo"} · limite de ${s.tempoMaxMin} min por rega.`;
+  const inp = $("#dlgLigarMin"); inp.value = s.duracaoMin; inp.max = s.tempoMaxMin;
+  $("#dlgLigarOk").textContent = ocupado ? "Pôr na fila" : "Ligar";
+  $("#dlgLigarOk").onclick = () => {
+    const m = Math.min(Number(inp.value) || 0, s.tempoMaxMin);
+    if (m < 1) { inp.focus(); return; }
+    $("#dlgLigar").close();
+    enviar({ acao: "ligar", setor: n, minutos: m }, ocupado ? `${s.nome} na fila` : `${s.nome} ligando`);
+  };
+  $("#dlgLigar").showModal();
+}
+
+function confirmar(titulo, texto, rotulo, acao) {
+  $("#dlgConfirmarTitulo").textContent = titulo;
+  $("#dlgConfirmarTexto").textContent = texto;
+  $("#dlgConfirmarOk").textContent = rotulo;
+  $("#dlgConfirmarOk").onclick = () => { $("#dlgConfirmar").close(); acao(); };
+  $("#dlgConfirmar").showModal();
+}
+
+/* ---------------------------------------------------------------------
+   Histórico (gráficos em SVG puro)
+   --------------------------------------------------------------------- */
+function graficoBarras(valores, rotulos, cor, opcoes = {}) {
+  const L = 330, A = 150, base = 120, topo = 14;
+  const max = Math.max(opcoes.minMax || 1, ...valores);
+  const passo = L / valores.length, larg = Math.max(3, passo * 0.62);
+  const cadaRot = Math.ceil(valores.length / 7);
+  let s = `<svg viewBox="0 0 ${L} ${A}" role="img" aria-label="${esc(opcoes.descricao || "")}">`;
+  s += `<line x1="0" y1="${base}" x2="${L}" y2="${base}" stroke="#CFC9B8"/>`;
+  valores.forEach((v, i) => {
+    const h = (v / max) * (base - topo), x = i * passo + (passo - larg) / 2;
+    if (v > 0) s += `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${larg.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${cor}"><title>${esc(rotulos[i])}: ${num(v)}</title></rect>`;
+    if (v === max && v > 0) s += `<text x="${(x + larg / 2).toFixed(1)}" y="${(base - h - 4).toFixed(1)}" font-size="11" fill="#55635B" text-anchor="middle">${num(v)}</text>`;
+    if (i % cadaRot === 0 || i === valores.length - 1) s += `<text x="${(i * passo + passo / 2).toFixed(1)}" y="140" font-size="11" fill="#55635B" text-anchor="middle">${esc(rotulos[i])}</text>`;
+  });
+  return s + "</svg>";
+}
+
+function graficoLinhas(series, rotulos, opcoes = {}) {
+  const L = 330, A = 150, base = 120, topo = 12;
+  const todos = series.flatMap(s => s.valores);
+  const min = Math.floor(Math.min(...todos) - 1), max = Math.ceil(Math.max(...todos) + 1);
+  const passo = L / rotulos.length, y = v => base - ((v - min) / (max - min)) * (base - topo);
+  const cadaRot = Math.ceil(rotulos.length / 7);
+  let s = `<svg viewBox="0 0 ${L} ${A}" role="img" aria-label="${esc(opcoes.descricao || "")}">`;
+  s += `<line x1="0" y1="${base}" x2="${L}" y2="${base}" stroke="#CFC9B8"/>`;
+  s += `<text x="2" y="${topo + 4}" font-size="10" fill="#55635B">${max}</text><text x="2" y="${base - 3}" font-size="10" fill="#55635B">${min}</text>`;
+  for (const se of series) {
+    const pts = se.valores.map((v, i) => `${(i * passo + passo / 2).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    s += `<polyline points="${pts}" fill="none" stroke="${se.cor}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    if (se.valores.length <= 10) se.valores.forEach((v, i) => { s += `<circle cx="${(i * passo + passo / 2).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${se.cor}"><title>${esc(rotulos[i])}: ${num(v)}</title></circle>`; });
+  }
+  rotulos.forEach((r, i) => { if (i % cadaRot === 0 || i === rotulos.length - 1) s += `<text x="${(i * passo + passo / 2).toFixed(1)}" y="140" font-size="11" fill="#55635B" text-anchor="middle">${esc(r)}</text>`; });
+  return s + "</svg>";
+}
+
+async function desenharHistorico() {
+  const p = estadoApp.periodo;
+  $$("#periodos button").forEach(b => b.classList.toggle("ativo", b.dataset.p === p));
+  let h;
+  try { h = await api.historico(p); } catch { $("#graficos").innerHTML = `<p class="aviso erro">Não foi possível carregar o histórico.</p>`; return; }
+  const total = h.chuvaMm.reduce((a, b) => a + b, 0);
+  const cartao = (titulo, svg, legenda = "") => `<div class="cartao grafico"><h3>${titulo}</h3>${svg}${legenda}</div>`;
+  let html = cartao(`Chuva ${p === "hoje" ? "por hora" : "por dia"} · total ${num(total)} mm`,
+    graficoBarras(h.chuvaMm, h.rotulos, "#2B6CA3", { descricao: "Chuva no período" }));
+  if (p === "hoje") {
+    html += cartao("Temperatura ao longo do dia (°C)", graficoLinhas([{ valores: h.tempMaxC, cor: "#B7791F" }], h.rotulos, { descricao: "Temperatura hora a hora" }));
+  } else {
+    html += cartao("Temperatura (°C)", graficoLinhas([{ valores: h.tempMaxC, cor: "#B7791F" }, { valores: h.tempMinC, cor: "#2B6CA3" }], h.rotulos, { descricao: "Temperatura máxima e mínima" }),
+      `<div class="legenda"><span><i style="background:#B7791F"></i>máxima</span><span><i style="background:#2B6CA3"></i>mínima</span></div>`);
+    html += cartao("Evaporação estimada (ET0, mm)", graficoBarras(h.et0Mm, h.rotulos, "#B7791F", { descricao: "Evapotranspiração por dia" }));
+  }
+  $("#graficos").innerHTML = html;
+
+  $("#tabelaRegas").innerHTML = `<thead><tr><th>Setor</th><th class="num">Regas</th><th class="num">Tempo</th></tr></thead><tbody>` +
+    h.regas.map(r => `<tr><td>${esc(r.nome)}</td><td class="num">${r.vezes}</td><td class="num">${r.minutos} min</td></tr>`).join("") + "</tbody>";
+  $("#eventos").innerHTML = h.eventos.map(([t, txt]) => `<li><time>${esc(t)}</time><span>${esc(txt)}</span></li>`).join("");
+}
+
+/* ---------------------------------------------------------------------
+   Ajustes: tudo que dá para configurar no controlador
+   Cada campo tem data-cfg="caminho.no.objeto" e lê/escreve no rascunho.
+   --------------------------------------------------------------------- */
+const obter = (obj, caminho) => caminho.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
+function definir(obj, caminho, valor) {
+  const ks = caminho.split("."); const ult = ks.pop();
+  ks.reduce((o, k) => o[k], obj)[ult] = valor;
+}
+
+function campoNumero(cfg, rotulo, un, attrs = "", ajuda = "") {
+  return `<div class="campo"><label>${rotulo}</label><div class="unidade">
+    <input type="number" data-cfg="${cfg}" inputmode="decimal" ${attrs}>${un ? `<span>${un}</span>` : ""}</div>
+    ${ajuda ? `<p class="ajuda">${ajuda}</p>` : ""}</div>`;
+}
+const campoTexto = (cfg, rotulo, tipo = "text", ajuda = "", attrs = "") =>
+  `<div class="campo"><label>${rotulo}</label><input type="${tipo}" data-cfg="${cfg}" ${attrs}>${ajuda ? `<p class="ajuda">${ajuda}</p>` : ""}</div>`;
+const campoInterruptor = (cfg, rotulo, ajuda = "") =>
+  `<div class="campo"><label class="interruptor"><span>${rotulo}${ajuda ? `<br><span class="ajuda" style="font-weight:400">${ajuda}</span>` : ""}</span>
+   <input type="checkbox" data-cfg="${cfg}"></label></div>`;
+const campoSegmentado = (cfg, rotulo, opcoes) =>
+  `<div class="campo"><span class="rotulo">${rotulo}</span><div class="segmentado" data-seg="${cfg}">
+   ${opcoes.map(([v, t]) => `<button type="button" data-valor="${v}">${t}</button>`).join("")}</div></div>`;
+const campoDias = (cfg, rotulo = "Dias da semana") =>
+  `<div class="campo"><span class="rotulo">${rotulo}</span><div class="dias" data-dias="${cfg}">
+   ${DIAS.map((d, i) => `<button type="button" data-i="${i}" aria-label="${DIAS_NOME[i]}">${d}</button>`).join("")}</div></div>`;
+const grupo = (titulo, resumo, corpo, aberto = false) =>
+  `<details class="grupo"${aberto ? " open" : ""}><summary><span>${titulo}<small>${resumo}</small></span></summary><div class="campos">${corpo}</div></details>`;
+
+function htmlSetor(i) {
+  const p = `setores.${i}`;
+  return `<details class="subsetor" data-setor-det="${i + 1}"><summary><span><b data-nome-setor="${i}"></b> <span class="suave pequeno" data-resumo-setor="${i}"></span></span><span class="suave">›</span></summary>
+  <div class="campos">
+    ${campoInterruptor(`${p}.ativo`, "Setor ativo")}
+    ${campoTexto(`${p}.nome`, "Nome", "text", "", 'maxlength="20"')}
+    ${campoSegmentado(`${p}.tipo`, "Tipo de rega", [["gotejo", "Gotejo"], ["aspersao", "Aspersão"]])}
+    <div class="campo"><span class="rotulo">Horários (modo individual)</span><div class="horarios" data-horarios="${i}"></div>
+      <button type="button" class="btn contorno" data-add-horario="${i}" style="min-height:40px">+ Horário</button>
+      <p class="aviso oculto" data-conflito="${i}"></p></div>
+    ${campoDias(`${p}.dias`)}
+    ${campoNumero(`${p}.duracaoMin`, "Duração padrão", "min", 'min="1" max="240" step="1"', "Usada na agenda, no ciclo e ao ligar na mão. Com o balanço hídrico ligado, o tempo é ajustado pelo déficit.")}
+    ${campoNumero(`${p}.tempoMaxMin`, "Tempo máximo por rega", "min", 'min="1" max="240" step="1"', "Nenhuma rega deste setor passa disso.")}
+    <div class="duas">
+      <div class="campo"><label>Janela: início</label><input type="time" data-cfg="${p}.janela.0"></div>
+      <div class="campo"><label>Janela: fim</label><input type="time" data-cfg="${p}.janela.1"></div>
+    </div>
+    <p class="ajuda" style="margin-top:-8px">O controlador só rega este setor dentro da janela. Na aspersão, prefira a madrugada.</p>
+    <details class="subsetor"><summary><span>Balanço hídrico</span><span class="suave">›</span></summary><div class="campos">
+      ${campoNumero(`${p}.taxaMmH`, "Taxa de aplicação", "mm/h", 'min="0.1" max="100" step="0.1"', "Medida no campo: método dos copos (aspersão) ou vazão dos gotejadores (gotejo).")}
+      ${campoNumero(`${p}.eficienciaPct`, "Eficiência", "%", 'min="10" max="100" step="1"')}
+      ${campoNumero(`${p}.kc`, "Coeficiente da cultura (Kc)", "", 'min="0.1" max="2" step="0.05"', "Cacau adulto: comece em 1,0.")}
+      ${campoNumero(`${p}.deficitMinMm`, "Déficit mínimo para regar", "mm", 'min="0" max="100" step="0.5"')}
+      ${campoNumero(`${p}.fator`, "Fator de ajuste", "×", 'min="0.1" max="3" step="0.05"', "Calibre olhando o solo: abaixo de 1 rega menos, acima de 1 rega mais.")}
+    </div></details>
+  </div></details>`;
+}
+
+function htmlAjustes() {
+  return [
+    grupo("Modo de operação", "como o controlador decide regar", `
+      ${campoSegmentado("modo", "Modo", [["individual", "Individual"], ["ciclo", "Ciclo"]])}
+      <p class="ajuda" id="ajudaModo"></p>
+      <div id="blocoCiclo" style="display:grid;gap:14px">
+        ${campoTexto("ciclo.inicio", "Início do ciclo", "time")}
+        ${campoDias("ciclo.dias", "Dias do ciclo")}
+      </div>
+      ${campoInterruptor("balancoHidrico", "Ajustar o tempo pelo balanço hídrico", "Rega mais quando a evaporação está alta e menos quando há água no solo.")}
+      ${campoInterruptor("adiarPorChuva", "Adiar a rega depois de chuva")}
+      ${campoNumero("chuvaAdiarMm", "Chuva que adia a rega", "mm em 24 h", 'min="0" max="100" step="0.5"')}`, true),
+    grupo("Setores", "nomes, horários e parâmetros", Array.from({ length: 8 }, (_, i) => htmlSetor(i)).join("")),
+    grupo("Bomba e sequência", "tempos de segurança", `
+      ${campoInterruptor("bomba.usar", "Usar bomba", "Desligue se a água vem por gravidade ou da rede.")}
+      ${campoNumero("bomba.atrasoLigarS", "Bomba liga depois de a válvula abrir", "s", 'min="0" max="30" step="1"')}
+      ${campoNumero("bomba.atrasoFecharS", "Válvula fecha depois de a bomba desligar", "s", 'min="0" max="30" step="1"')}
+      ${campoNumero("bomba.pausaEntreSetoresS", "Pausa entre setores", "s", 'min="0" max="120" step="1"')}`),
+    grupo("Estação meteorológica", "calibração e solo", `
+      ${campoNumero("estacao.mmPorBasculada", "Chuva por basculada", "mm", 'min="0.01" max="2" step="0.01"', "Valor da calibração com seringa.")}
+      ${campoNumero("estacao.chuvaEfetivaMinMm", "Chuva mínima que conta", "mm", 'min="0" max="20" step="0.5"', "Chuvas menores que isso não entram no saldo.")}
+      ${campoNumero("estacao.capacidadeSoloMm", "Capacidade de água do solo", "mm", 'min="5" max="300" step="1"', "Limite máximo do saldo.")}
+      ${campoNumero("estacao.latitude", "Latitude do local", "°", 'min="-90" max="90" step="0.0001" placeholder="ex.: -14.7900"', "Usada no cálculo da radiação (Ra). Sul é negativo.")}
+      ${campoNumero("estacao.ajusteTempC", "Correção da temperatura", "°C", 'min="-10" max="10" step="0.1"', "Para alinhar o BME280 com um termômetro de referência.")}`),
+    grupo("Data e hora", "relógio do controlador", `
+      ${campoInterruptor("relogio.ntp", "Acertar pela internet (NTP)", "Sem internet, o relógio (RTC) continua valendo.")}
+      <div class="campo"><label>Fuso horário</label><select data-cfg="relogio.fuso">
+        ${["America/Noronha", "America/Sao_Paulo", "America/Bahia", "America/Fortaleza", "America/Recife", "America/Belem", "America/Manaus", "America/Cuiaba", "America/Campo_Grande", "America/Porto_Velho", "America/Boa_Vista", "America/Rio_Branco"]
+          .map(f => `<option value="${f}">${f.replace("America/", "").replace("_", " ")}</option>`).join("")}</select></div>
+      <button type="button" class="btn contorno" id="btnAcertarHora">Usar a hora deste aparelho</button>`),
+    grupo("Rede", "Wi-Fi e rede própria", `
+      ${campoTexto("rede.wifiNome", "Wi-Fi da casa", "text", "", 'autocomplete="off"')}
+      ${campoTexto("rede.wifiSenha", "Senha do Wi-Fi", "password", "Deixe em branco para manter a atual.", 'autocomplete="new-password"')}
+      ${campoTexto("rede.apNome", "Nome da rede própria (AP)", "text", "", 'maxlength="32"')}
+      ${campoTexto("rede.apSenha", "Senha da rede própria", "password", "Mínimo de 8 caracteres. Em branco mantém a atual.", 'autocomplete="new-password" minlength="8"')}
+      ${campoInterruptor("rede.apSempre", "Manter a rede própria sempre ligada", "Se desligado, ela só liga quando o Wi-Fi da casa falha.")}`),
+    grupo("Registro e nuvem", "cartão SD e Google Drive", `
+      ${campoNumero("registro.diasNoCartao", "Dias guardados no cartão", "dias", 'min="1" max="60" step="1"')}
+      ${campoInterruptor("registro.drive", "Enviar ao Google Drive")}
+      ${campoTexto("registro.driveUrl", "Endereço do Apps Script", "text", "", 'placeholder="https://script.google.com/macros/s/…/exec"')}
+      ${campoNumero("registro.envioHoras", "Enviar a cada", "horas", 'min="1" max="168" step="1"')}`),
+    grupo("Display e encoder", "interface na caixa", `
+      ${campoNumero("display.luzSegundos", "Luz de fundo apaga depois de", "s", 'min="0" max="600" step="5"', "0 deixa sempre acesa.")}
+      ${campoInterruptor("display.travarComandos", "Travar comandos no display", "O display só mostra informações; ligar e parar ficam só pela página.")}`),
+    grupo("Segurança", "senha e sessão", `
+      ${campoNumero("seguranca.sessaoMin", "Sair sozinho depois de", "min", 'min="5" max="1440" step="5"')}
+      <div class="campo"><label for="novaSenha">Nova senha da página</label><input type="password" id="novaSenha" autocomplete="new-password" minlength="6">
+        <p class="ajuda">Mínimo de 6 caracteres. Em branco mantém a atual.</p></div>`),
+    grupo("Sistema", "versão, backup e reinício", `
+      <div class="status-lista" id="infoSistema"></div>
+      <div class="downloads">
+        <button type="button" class="btn contorno" id="btnExportar">Exportar ajustes</button>
+        <label class="btn contorno" style="display:flex;align-items:center;justify-content:center">Importar ajustes<input type="file" id="arqImportar" accept="application/json" hidden></label>
+      </div>
+      <div class="downloads">
+        <button type="button" class="btn contorno" id="btnPadrao">Restaurar padrão</button>
+        <button type="button" class="btn perigo" id="btnReiniciar">Reiniciar controlador</button>
+      </div>`),
+  ].join("");
+}
+
+function preencherAjustes() {
+  const r = estadoApp.rascunho, raiz = $("#formAjustes");
+  $$("[data-cfg]", raiz).forEach(el => {
+    const v = obter(r, el.dataset.cfg);
+    if (el.type === "checkbox") el.checked = !!v; else el.value = v ?? "";
+  });
+  $$("[data-seg]", raiz).forEach(el => { const v = obter(r, el.dataset.seg); $$("button", el).forEach(b => b.classList.toggle("ativo", b.dataset.valor === v)); });
+  $$("[data-dias]", raiz).forEach(el => { const v = obter(r, el.dataset.dias); $$("button", el).forEach(b => b.classList.toggle("ativo", !!v[b.dataset.i])); });
+  r.setores.forEach((s, i) => {
+    $(`[data-nome-setor="${i}"]`).textContent = s.nome;
+    $(`[data-resumo-setor="${i}"]`).textContent = s.ativo ? `${s.tipo === "aspersao" ? "aspersão" : "gotejo"} · ${s.horarios.join(", ") || "sem horário"} · ${s.duracaoMin} min` : "desativado";
+    $(`[data-horarios="${i}"]`).innerHTML = s.horarios.map((h, k) =>
+      `<span class="h"><input type="time" value="${h}" data-horario="${i}.${k}" aria-label="Horário ${k + 1}"><button type="button" data-del-horario="${i}.${k}" aria-label="Remover horário">×</button></span>`).join("");
+  });
+  const ciclo = r.modo === "ciclo";
+  $("#blocoCiclo").style.display = ciclo ? "grid" : "none";
+  $("#ajudaModo").textContent = ciclo
+    ? "Todos os setores ativos regam em sequência, a partir do horário de início, cada um pela sua duração."
+    : "Cada setor rega nos próprios horários. Se dois coincidirem, o segundo entra na fila.";
+  verificarConflitos();
+  const e = estadoApp.estado;
+  if (e) $("#infoSistema").innerHTML = `<div><span class="suave">Firmware</span><span>${esc(e.versao)}</span></div><div><span class="suave">Endereço</span><span>${esc(e.sistema.ip)}</span></div>`;
+  const leitura = !estadoApp.logado;
+  $("#avisoLeitura").classList.toggle("oculto", !leitura);
+  $$("input,select,button:not(summary)", raiz).forEach(el => { if (!el.closest("summary")) el.disabled = leitura; });
+}
+
+// Horários sobrepostos no modo individual (mesmo dia, intervalos que se cruzam).
+function verificarConflitos() {
+  const r = estadoApp.rascunho;
+  const regas = [];
+  r.setores.forEach((s, i) => { if (s.ativo) s.horarios.forEach(h => { const [hh, mm] = h.split(":").map(Number); regas.push({ i, ini: hh * 60 + mm, fim: hh * 60 + mm + s.duracaoMin, dias: s.dias }); }); });
+  r.setores.forEach((_, i) => {
+    const conflitos = new Set();
+    regas.filter(a => a.i === i).forEach(a => regas.forEach(b => {
+      if (b.i !== i && a.dias.some((d, k) => d && b.dias[k]) && a.ini < b.fim && b.ini < a.fim) conflitos.add(b.i + 1);
+    }));
+    const el = $(`[data-conflito="${i}"]`);
+    if (!el) return;
+    el.classList.toggle("oculto", conflitos.size === 0 || r.modo !== "individual");
+    el.textContent = conflitos.size ? `Coincide com ${[...conflitos].map(n => r.setores[n - 1].nome).join(", ")}. Não é erro: um espera o outro na fila, mas a rega vai atrasar.` : "";
+  });
+}
+
+function marcarSujo() {
+  estadoApp.sujo = JSON.stringify(estadoApp.rascunho) !== JSON.stringify(estadoApp.config) || !!$("#novaSenha")?.value;
+  $("#barraSalvar").classList.toggle("oculto", !estadoApp.sujo);
+}
+
+function desenharAjustes() {
+  if (!estadoApp.config) return;
+  const raiz = $("#formAjustes");
+  if (!raiz.dataset.pronto) { raiz.innerHTML = htmlAjustes(); raiz.dataset.pronto = "1"; ligarAjustes(raiz); }
+  if (!estadoApp.sujo) estadoApp.rascunho = structuredClone(estadoApp.config);
+  preencherAjustes();
+}
+
+function ligarAjustes(raiz) {
+  raiz.addEventListener("input", ev => {
+    const el = ev.target;
+    if (el.dataset.cfg) {
+      let v = el.type === "checkbox" ? el.checked : el.value;
+      if (el.type === "number") v = el.value === "" ? null : Number(el.value);
+      definir(estadoApp.rascunho, el.dataset.cfg, v);
+      if (el.dataset.cfg.endsWith(".nome") || el.dataset.cfg.endsWith(".duracaoMin")) preencherResumoSetores();
+      if (el.dataset.cfg.endsWith(".duracaoMin")) verificarConflitos();
+    } else if (el.dataset.horario) {
+      const [i, k] = el.dataset.horario.split(".").map(Number);
+      estadoApp.rascunho.setores[i].horarios[k] = el.value;
+      estadoApp.rascunho.setores[i].horarios.sort();
+      verificarConflitos();
+    }
+    marcarSujo();
+  });
+  raiz.addEventListener("change", ev => { if (ev.target.dataset.cfg?.endsWith(".ativo") || ev.target.dataset.horario) preencherAjustes(); });
+  raiz.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b || b.disabled) return;
+    const seg = b.closest("[data-seg]"), dias = b.closest("[data-dias]");
+    if (seg) { definir(estadoApp.rascunho, seg.dataset.seg, b.dataset.valor); preencherAjustes(); marcarSujo(); }
+    else if (dias) { const arr = obter(estadoApp.rascunho, dias.dataset.dias); arr[b.dataset.i] = arr[b.dataset.i] ? 0 : 1; preencherAjustes(); marcarSujo(); }
+    else if (b.dataset.addHorario) { const s = estadoApp.rascunho.setores[b.dataset.addHorario]; if (s.horarios.length < 6) s.horarios.push("12:00"); s.horarios.sort(); preencherAjustes(); marcarSujo(); }
+    else if (b.dataset.delHorario) { const [i, k] = b.dataset.delHorario.split(".").map(Number); estadoApp.rascunho.setores[i].horarios.splice(k, 1); preencherAjustes(); marcarSujo(); }
+    else if (b.id === "btnAcertarHora") enviar({ acao: "acertarHora", hora: new Date().toISOString() }, "Hora acertada");
+    else if (b.id === "btnExportar") exportarAjustes();
+    else if (b.id === "btnPadrao") confirmar("Restaurar padrão?", "Os ajustes voltam ao padrão de fábrica no formulário. Nada muda até você salvar.", "Restaurar", () => {
+      const atual = estadoApp.rascunho; const p = configPadrao(); p.rede = atual.rede; estadoApp.rascunho = p; preencherAjustes(); marcarSujo(); });
+    else if (b.id === "btnReiniciar") confirmar("Reiniciar o controlador?", "Qualquer rega em andamento para, e nenhuma é retomada depois do reinício.", "Reiniciar", () => enviar({ acao: "reiniciar" }, "Reiniciando…"));
+  });
+  $("#arqImportar", raiz).addEventListener("change", async ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    try { const c = JSON.parse(await f.text()); if (!Array.isArray(c.setores) || c.setores.length !== 8) throw 0; estadoApp.rascunho = { ...configPadrao(), ...c }; preencherAjustes(); marcarSujo(); toast("Ajustes importados. Confira e salve."); }
+    catch { toast("Arquivo inválido"); }
+    ev.target.value = "";
+  });
+}
+
+function preencherResumoSetores() {
+  estadoApp.rascunho.setores.forEach((s, i) => { $(`[data-nome-setor="${i}"]`).textContent = s.nome || `Setor ${i + 1}`; });
+}
+
+function exportarAjustes() {
+  const c = structuredClone(estadoApp.config);
+  c.rede.wifiSenha = ""; c.rede.apSenha = "";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(c, null, 2)], { type: "application/json" }));
+  a.download = `sabia-ajustes-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function validarRascunho() {
+  const invalido = $$("#formAjustes input:invalid");
+  if (invalido.length) { invalido[0].closest("details.grupo").open = true; invalido[0].closest("details.subsetor")?.setAttribute("open", ""); invalido[0].focus(); return "Há um valor fora da faixa."; }
+  const r = estadoApp.rascunho;
+  for (const s of r.setores) if (s.duracaoMin > s.tempoMaxMin) return `${s.nome}: a duração passa do tempo máximo.`;
+  if (r.registro.drive && !/^https:\/\//.test(r.registro.driveUrl)) return "Informe o endereço do Apps Script para usar o Drive.";
+  const ns = $("#novaSenha").value; if (ns && ns.length < 6) return "A nova senha precisa de 6 caracteres ou mais.";
+  return null;
+}
+
+async function salvar() {
+  if (!exigirLogin()) return;
+  const erro = validarRascunho(); if (erro) { toast(erro); return; }
+  const envio = structuredClone(estadoApp.rascunho);
+  const ns = $("#novaSenha").value; if (ns) envio.seguranca.novaSenha = ns;
+  try {
+    await api.salvarConfig(envio);
+    delete envio.seguranca.novaSenha;
+    estadoApp.config = envio; estadoApp.sujo = false; $("#novaSenha").value = "";
+    $("#barraSalvar").classList.add("oculto"); toast("Ajustes salvos"); desenharPainel();
+  } catch (e) { toast(e.message || "Não foi possível salvar"); }
+}
+
+/* ---------------------------------------------------------------------
+   Atualização periódica
+   --------------------------------------------------------------------- */
+async function atualizar() {
+  try {
+    if (api.modoDemo) demo.tick();
+    const e = await api.estado();
+    estadoApp.estado = e; estadoApp.logado = !!e.sessao?.logado; estadoApp.ultimaAtualizacao = Date.now();
+    if (estadoApp.pagina === "painel") desenharPainel();
+  } catch { /* mantém os últimos dados; o topo mostra que estão velhos */ }
+  desenharTopo();
+}
+
+/* ---------------------------------------------------------------------
+   Eventos globais
+   --------------------------------------------------------------------- */
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.hasAttribute("data-fechar")) { b.closest("dialog").close(); return; }
+  if (b.dataset.ligar) abrirLigar(Number(b.dataset.ligar));
+  else if (b.dataset.parar) { const n = Number(b.dataset.parar); const reg = estadoApp.estado.atual?.setor === n; if (exigirLogin()) enviar({ acao: "parar", setor: n }, reg ? `${nomeSetor(n)} parando` : `${nomeSetor(n)} saiu da fila`); }
+  else if (b.dataset.tirar) { const n = Number(b.dataset.tirar); if (exigirLogin()) enviar({ acao: "parar", setor: n }, `${nomeSetor(n)} saiu da fila`); }
+  else if (b.dataset.acao === "pular") { if (exigirLogin()) enviar({ acao: "pular" }, "Pulando setor"); }
+  else if (b.dataset.acao === "pararTudo") { if (exigirLogin()) confirmar("Parar tudo?", "O setor atual fecha e a fila é esvaziada. A agenda continua valendo para as próximas regas.", "Parar tudo", () => enviar({ acao: "pararTudo" }, "Parando tudo")); }
+  else if (b.dataset.configSetor) { location.hash = "ajustes"; setTimeout(() => { const g = $$("details.grupo")[1]; g.open = true; const d = $(`[data-setor-det="${b.dataset.configSetor}"]`); d.open = true; d.scrollIntoView({ block: "start" }); }, 50); }
+  else if (b.id === "verTodos") { estadoApp.mostrarTodos = true; desenharSetores(); }
+  else if (b.id === "btnCiclo") { if (exigirLogin()) confirmar("Iniciar ciclo agora?", "Todos os setores ativos entram na fila, cada um pela sua duração padrão.", "Iniciar", () => enviar({ acao: "ciclo" }, "Ciclo iniciado")); }
+  else if (b.id === "chipStatus") abrirStatus();
+  else if (b.id === "chipSessao") { if (estadoApp.logado) api.sair().then(() => { estadoApp.logado = false; atualizar(); preencherSeAjustes(); toast("Você saiu"); }); else abrirEntrar(); }
+  else if (b.id === "btnEntrarOk") entrar();
+  else if (b.id === "btnSalvar") salvar();
+  else if (b.id === "btnDescartar") { estadoApp.sujo = false; estadoApp.rascunho = structuredClone(estadoApp.config); $("#novaSenha").value = ""; preencherAjustes(); $("#barraSalvar").classList.add("oculto"); }
+  else if (b.dataset.passo) { const i = $("#dlgLigarMin"); i.value = Math.max(1, Math.min(Number(i.max) || 240, (Number(i.value) || 0) + Number(b.dataset.passo))); }
+  else if (b.closest("#periodos")) { estadoApp.periodo = b.dataset.p; desenharHistorico(); }
+  else if (b.dataset.csv) baixarCsv(b.dataset.csv);
+});
+$("#senhaEntrar").addEventListener("keydown", ev => { if (ev.key === "Enter") entrar(); });
+window.addEventListener("beforeunload", ev => { if (estadoApp.sujo) { ev.preventDefault(); ev.returnValue = ""; } });
+
+function preencherSeAjustes() { if (estadoApp.pagina === "ajustes") preencherAjustes(); }
+
+async function entrar() {
+  try {
+    await api.entrar($("#senhaEntrar").value);
+    estadoApp.logado = true; $("#dlgEntrar").close(); toast("Entrou"); await atualizar(); preencherSeAjustes();
+  } catch { $("#erroEntrar").classList.remove("oculto"); }
+}
+
+async function baixarCsv(tipo) {
+  if (!api.modoDemo) { location.href = api.csvUrl(tipo, estadoApp.periodo); return; }
+  const h = await api.historico(estadoApp.periodo);
+  let csv;
+  if (tipo === "regas") csv = "setor;nome;regas;minutos\n" + h.regas.map(r => `${r.setor};${r.nome};${r.vezes};${r.minutos}`).join("\n");
+  else if (tipo === "chuva") csv = "periodo;chuva_mm\n" + h.rotulos.map((r, i) => `${r};${h.chuvaMm[i].toFixed(1).replace(".", ",")}`).join("\n");
+  else csv = "periodo;temp_max_c;temp_min_c;et0_mm\n" + h.rotulos.map((r, i) => `${r};${h.tempMaxC[i].toFixed(1).replace(".", ",")};${h.tempMinC ? h.tempMinC[i].toFixed(1).replace(".", ",") : ""};${h.et0Mm ? h.et0Mm[i].toFixed(1).replace(".", ",") : ""}`).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
+  a.download = `sabia-${tipo}-${estadoApp.periodo}.csv`; a.click();
+}
+
+/* ---------------------------------------------------------------------
+   Início
+   --------------------------------------------------------------------- */
+(async function iniciar() {
+  await api.iniciar();
+  $("#faixaDemo").classList.toggle("oculto", !api.modoDemo);
+  try { estadoApp.config = await api.config(); } catch { estadoApp.config = configPadrao(); }
+  estadoApp.rascunho = structuredClone(estadoApp.config);
+  irPara(location.hash.slice(1) || "painel");
+  await atualizar();
+  setInterval(atualizar, api.modoDemo ? 1000 : 3000);
+  setInterval(desenharTopo, 1000);
+})();
+</script>
+</body>
+</html>
