@@ -1,0 +1,46 @@
+name: Caixa 3D
+
+on:
+  push:
+    branches: [main]
+    paths: ["hardware/caixa-3d/**", ".github/workflows/caixa.yml"]
+  pull_request:
+    paths: ["hardware/caixa-3d/**", ".github/workflows/caixa.yml"]
+  workflow_dispatch:
+
+jobs:
+  stl:
+    name: Gerar STL e imagens
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hardware/caixa-3d
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar OpenSCAD
+        run: sudo apt-get update -q && sudo apt-get install -y -q openscad xvfb
+      - name: Gerar STL (para de vez em qualquer aviso)
+        run: |
+          mkdir -p saida
+          for p in base tampa; do
+            openscad --hardwarnings -D "parte=\"$p\"" -o saida/sabia-caixa-$p.stl caixa.scad 2>&1 | tee saida/log-$p.txt
+          done
+          grep -h "Caixa externa\|Área interna" saida/log-base.txt || true
+      - name: Conferir que os STL não estão vazios
+        run: |
+          for f in saida/*.stl; do
+            n=$(grep -c "facet normal" "$f" || true)
+            echo "$f: $n triângulos"
+            test "$n" -gt 1000
+          done
+      - name: Gerar imagens
+        run: |
+          for p in montagem aberta base tampa; do
+            xvfb-run -a openscad -D "parte=\"$p\"" --render --viewall --autocenter --imgsize=1600,1200 \
+              --colorscheme=Tomorrow -o saida/sabia-caixa-$p.png caixa.scad
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: caixa-3d
+          path: hardware/caixa-3d/saida/
+          retention-days: 30
