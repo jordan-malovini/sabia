@@ -304,9 +304,10 @@ if (parte == "base") {
   }
   modulos(com_tela = false);
 } else if (parte == "montagem") {
+  // os opacos primeiro: o OpenSCAD esconde o que vem depois de um transparente
+  modulos();
   color("Tan", 0.35) base();
   color("Wheat", 0.35) tampa();
-  modulos();
 } else {  // por_dentro
   color("Tan") base();
   modulos(com_tela = false);
