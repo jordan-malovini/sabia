@@ -17,8 +17,8 @@ A prévia (F5) mostra cores e transparência. A renderização (F6) só serve pa
 
 | | Medida |
 | --- | --- |
-| Externa (fechada) | **217,8 × 240,2 × 69,8 mm** |
-| Interna | 213 × 235,4 × 65 mm |
+| Externa (fechada) | **217,2 × 240,2 × 69,8 mm** |
+| Interna | 212,4 × 235,4 × 65 mm |
 | Paredes, fundo e tampa | 2,4 mm |
 | Área de impressão da base | 246 × 241 mm (com as abas de parede) |
 | Área de impressão da tampa | 226 × 241 mm (com a dobradiça) |
@@ -32,7 +32,7 @@ A prévia (F5) mostra cores e transparência. A renderização (F6) só serve pa
 - **Embaixo:** o módulo de 16 relés, com os cabos das válvulas e da bomba saindo pelo fundo da caixa (dois prensa-cabos PG9). Ao lado ficam o RTC (deitado) e o módulo microSD (em pé), e abaixo deles o PG7 dos sensores.
 - **No alto, à esquerda:** a fonte, num **compartimento isolado** por divisórias, porque é a única parte com 127/220 V. A rede entra pela parede esquerda (PG9), com 12 mm livres para a porca, e as fendas de ventilação ficam na mesma parede. Os fios de 5 V saem por uma passagem junto ao fundo.
 - **No alto, à direita:** a placa de expansão com o ESP32-S3.
-- **Tampa:** a tela centralizada no alto, atrás de um visor de acrílico, e o encoder abaixo e à direita. A dobradiça fica do lado esquerdo e há dois parafusos M3 de fechamento: um no canto de baixo à direita e outro no alto da divisória. O canto de cima à direita ficaria sobre a placa do ESP.
+- **Tampa:** a tela centralizada no alto, atrás de um visor de acrílico, e o encoder abaixo e à direita. A dobradiça fica do lado esquerdo e há dois parafusos M3 de fechamento: um na parede direita, no vão entre o RTC e o microSD, e outro no alto da divisória.
 
 ![Corte lateral](../hardware/caixa-3d/corte.png)
 

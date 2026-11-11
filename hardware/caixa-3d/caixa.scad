@@ -91,7 +91,7 @@ p_rele  = [folga, folga];
 p_fonte = [margem_rede, y_sup + folga];
 p_expan = [x_div + div + folga, y_sup + folga];
 x_col   = folga + rele[0] + folga;           // coluna ao lado dos relés
-p_rtc   = [x_col, folga];
+p_rtc   = [x_col - 1, folga];
 p_sd    = [x_col + (rtc[0] - sd[0]) / 2, folga + rtc[1] + 21];  // 21 mm livres para os conectores do RTC
 
 W_in = max(p_expan[0] + expan[0] + folga, x_col + max(rtc[0], sd[0]) + folga);
@@ -104,9 +104,9 @@ P = D_in + t;                                // altura da base (fundo + interno)
 lcd_c = [W / 2, t + H_in - 12 - lcd[1] / 2];
 enc_c = [lcd_c[0] + 30, lcd_c[1] - lcd[1] / 2 - 24];
 
-// Parafusos de fechamento: canto de baixo à direita e alto da divisória
-// (o canto de cima à direita fica sobre a placa do ESP)
-fech = [[W - t - 4, t + 4], [t + x_div + div / 2, H - t - 4]];
+// Parafusos de fechamento: parede direita, no vão entre o RTC e o microSD, e
+// alto da divisória (os cantos da direita ficam sobre o RTC e a placa do ESP)
+fech = [[W - t - 4, t + folga + rtc[1] + 10], [t + x_div + div / 2, H - t - 4]];
 
 // Dobradiça (lado esquerdo, na borda da tampa)
 r_dob   = 4;

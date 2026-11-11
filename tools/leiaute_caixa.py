@@ -10,12 +10,12 @@ rele=(180,90,20); fonte=(99,131,40); expan=(90,130,30); rtc=(22,38,17); sd=(17.5
 inset=3.5
 h_inf=rele[1]+2*folga; y_sup=h_inf+div; x_div=margem+fonte[0]+folga
 p_rele=(folga,folga); p_fonte=(margem,y_sup+folga); p_expan=(x_div+div+folga,y_sup+folga)
-x_col=folga+rele[0]+folga; p_rtc=(x_col,folga); p_sd=(x_col+(rtc[0]-sd[0])/2,folga+rtc[1]+21)
+x_col=folga+rele[0]+folga; p_rtc=(x_col-1,folga); p_sd=(x_col+(rtc[0]-sd[0])/2,folga+rtc[1]+21)
 W_in=max(p_expan[0]+expan[0]+folga, x_col+max(rtc[0],sd[0])+folga)
 H_in=max(p_fonte[1]+fonte[1], p_expan[1]+expan[1])+folga
 W=W_in+2*t; H=H_in+2*t; P=D_in+t
 lcd_c=(W/2, t+H_in-12-lcd[1]/2); enc_c=(lcd_c[0]+30, lcd_c[1]-lcd[1]/2-24)
-fech=[(W-t-4,t+4),(t+x_div+div/2,H-t-4)]
+fech=[(W-t-4,t+folga+rtc[1]+10),(t+x_div+div/2,H-t-4)]
 L_dob=H*0.6; y_dob=(H-L_dob)/2; s_dob=(L_dob-4*0.5)/5
 print(f"externa {W:.1f} x {H:.1f} x {P+t:.1f}  interna {W_in:.1f} x {H_in:.1f} x {D_in}")
 
@@ -69,7 +69,7 @@ for sx in (-1,1):
     for sy in (-1,1): ax.add_patch(Circle((lcd_c[0]+sx*44,lcd_c[1]+sy*32.5),3,fc="#2E7D32",ec="none"))
 ax.add_patch(Circle(enc_c,3.75,fc="#333")); ax.text(enc_c[0],enc_c[1]-9,"encoder Ø7,5",ha="center",fontsize=9)
 for f in fech: ax.add_patch(Circle(f,3.25,fc="white",ec="#333")); 
-ax.text(W-t-12,t+10,"fechamento M3",ha="right",va="center",fontsize=8); ax.text(t+x_div+div/2-7,H-t-4,"fechamento M3",ha="right",va="center",fontsize=8)
+ax.text(fech[0][0]-7,fech[0][1],"fechamento M3",ha="right",va="center",fontsize=8); ax.text(t+x_div+div/2-7,H-t-4,"fechamento M3",ha="right",va="center",fontsize=8)
 for i in range(1,5,2): ax.add_patch(Rectangle((-8,y_dob+i*(s_dob+.5)),8,s_dob,fc="#A0522D",ec="none",alpha=.8))
 ax.text(W/2,30,"SABIÁ",ha="center",fontsize=16,color="#1B4D2C",fontweight="bold",alpha=.5)
 ax.text(W/2,18,"(espaço para a logo em relevo ou adesivo)",ha="center",fontsize=8,color="#777")
