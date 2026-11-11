@@ -36,8 +36,8 @@ jobs:
           done
       - name: Gerar imagens
         run: |
-          for p in montagem aberta base tampa; do
-            xvfb-run -a openscad -D "parte=\"$p\"" --render --viewall --autocenter --imgsize=1600,1200 \
+          for p in por_dentro montagem aberta base tampa; do
+            xvfb-run -a openscad -D "parte=\"$p\"" --preview --viewall --autocenter --imgsize=1600,1200 \
               --colorscheme=Tomorrow -o saida/sabia-caixa-$p.png caixa.scad
           done
       - uses: actions/upload-artifact@v4

@@ -2,6 +2,15 @@
 
 Caixa de parede impressa em 3D, com uma base que leva os módulos e uma tampa com dobradiça que leva a tela e o encoder. O projeto é paramétrico, em OpenSCAD: [`hardware/caixa-3d/caixa.scad`](../hardware/caixa-3d/caixa.scad). Toda medida está no topo do arquivo e pode ser trocada numa linha.
 
+![Caixa montada, com a tampa transparente](../hardware/caixa-3d/render-montagem.png)
+
+Para ver por dentro no OpenSCAD, escolha `parte` (no topo do arquivo ou em **Window → Customizer**) e aperte **F5**:
+- `por_dentro`: base e componentes, sem tampa;
+- `montagem`: caixa fechada, com base e tampa transparentes;
+- `aberta`: tampa aberta na dobradiça, com a tela.
+
+A prévia (F5) mostra cores e transparência. A renderização (F6) só serve para exportar o STL, com `parte` em `base` ou `tampa`.
+
 ![Caixa aberta](../hardware/caixa-3d/render-aberta.png)
 
 ## Medidas

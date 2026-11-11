@@ -6,12 +6,17 @@
 // Como usar:
 //   1. Abra no OpenSCAD (gratuito) e confira as medidas marcadas MEDIR.
 //   2. Mude "parte" para "base" ou "tampa", aperte F6 e exporte o STL (F7).
-//   3. "montagem" mostra as duas partes fechadas, com os módulos em fantasma.
+//   3. Para ver por dentro, use "por_dentro", "montagem" ou "aberta" e aperte F5
+//      (a prévia mostra cores e transparência; o F6 descarta as cores).
 //
 // Medidas em mm. Coordenadas da base: X para a direita, Y para cima (caixa
 // presa na parede), Z saindo da parede em direção à tampa.
 
-parte = "montagem";  // "base", "tampa", "montagem", "aberta"
+// "por_dentro": base e componentes, sem tampa (melhor para ver o interior)
+// "montagem":   caixa fechada, com a tampa transparente
+// "aberta":     tampa aberta na dobradiça
+// "base" / "tampa": peças sozinhas, na posição de impressão (para exportar STL)
+parte = "por_dentro";  // [por_dentro, montagem, aberta, base, tampa]
 
 $fn = 48;
 
@@ -265,17 +270,21 @@ module tampa() {
 }
 
 // --------------------------------------------------------------------------
-// Módulos em fantasma (só para visualizar)
+// Módulos (só para visualizar; não vão para o STL)
 // --------------------------------------------------------------------------
-module modulos() {
+module modulos(com_tela = true) {
   translate([t, t, t]) {
-    color("SteelBlue", 0.5) translate([p_rele[0], p_rele[1], alt_suporte]) cube(rele);
-    color("Gray", 0.5) translate([p_fonte[0], p_fonte[1], 0]) cube(fonte);
-    color("SeaGreen", 0.5) translate([p_expan[0], p_expan[1], alt_suporte]) cube(expan);
-    color("Orange", 0.5) translate([p_rtc[0], p_rtc[1], 1]) cube(rtc);
-    color("Purple", 0.5) translate([p_sd[0], p_sd[1], 1]) cube(sd);
+    color("SteelBlue") translate([p_rele[0], p_rele[1], alt_suporte]) cube(rele);
+    color("Silver") translate([p_fonte[0], p_fonte[1], 0]) cube(fonte);
+    color("MediumSeaGreen") translate([p_expan[0], p_expan[1], alt_suporte]) cube(expan);
+    color("Orange") translate([p_rtc[0], p_rtc[1], 1]) cube(rtc);
+    color("MediumPurple") translate([p_sd[0], p_sd[1], 1]) cube(sd);
   }
-  color("LimeGreen", 0.5)
+  if (com_tela) tela();
+}
+
+module tela() {
+  color("YellowGreen")
     translate([lcd_c[0] - lcd[0] / 2, lcd_c[1] - lcd[1] / 2, P - lcd[2]]) cube(lcd);
 }
 
@@ -288,11 +297,18 @@ if (parte == "base") {
   // virada para imprimir com a face externa na mesa
   translate([W, 0, P + t]) rotate([0, 180, 0]) tampa();
 } else if (parte == "aberta") {
-  base();
-  translate([eixo[0], 0, eixo[1]]) rotate([0, -110, 0]) translate([-eixo[0], 0, -eixo[1]]) tampa();
-  %modulos();
-} else {
-  base();
-  tampa();
-  %modulos();
+  color("Tan") base();
+  translate([eixo[0], 0, eixo[1]]) rotate([0, -110, 0]) translate([-eixo[0], 0, -eixo[1]]) {
+    color("Wheat") tampa();
+    tela();
+  }
+  modulos(com_tela = false);
+} else if (parte == "montagem") {
+  // os opacos primeiro: o OpenSCAD esconde o que vem depois de um transparente
+  modulos();
+  color("Tan", 0.35) base();
+  color("Wheat", 0.35) tampa();
+} else {  // por_dentro
+  color("Tan") base();
+  modulos(com_tela = false);
 }
