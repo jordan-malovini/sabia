@@ -41,8 +41,9 @@ d_passante  = 3.4;  // furo passante para M3
 rele  = [180, 90, 20];   // módulo de 16 relés
 fonte = [99, 131, 40];   // fonte 5 V 10 A (131 x 99 x 40), em pé
 expan = [90, 130, 30];   // placa de expansão do ESP32-S3 (130 x 90 x 30), em pé
-rtc   = [17, 38, 22];    // módulo RTC DS3231 (38 x 17 x 22), em pé
-sd    = [24, 42, 6];     // módulo microSD. MEDIR: medida estimada, não informada
+rtc   = [22, 38, 17];    // módulo RTC DS3231 HW-084, deitado, com a pilha para a frente
+sd    = [17.5, 18.5, 5]; // módulo microSD (largura, comprimento, espessura), medido com régua
+sd_cartao = 28;          // comprimento com o cartão encaixado
 lcd   = [93, 70, 13.5];  // tela ST7920 12864B (desenho do fabricante)
 
 // Furos de fixação de cada placa, medidos a partir do canto inferior esquerdo
@@ -53,6 +54,17 @@ function cantos(m, i = inset) = [[i, i], [m[0] - i, i], [i, m[1] - i], [m[0] - i
 furos_rele  = cantos(rele);
 furos_expan = cantos(expan);
 furos_fonte = cantos(fonte, 10);  // MEDIR: furos roscados no fundo da fonte
+
+// RTC: 3 furos. MEDIR: posições estimadas por foto do HW-084 (placa de 38 x 22),
+// vista pelo lado da pilha, com os pinos apontando para cima (para o SD).
+furos_rtc = [[1.7, 3.4], [1.7, 28.8], [20.2, 28.8]];
+
+// microSD em pé: cartão apontando para a tampa, pinos apontando para o ESP.
+// A placa é parafusada por 2 furos numa paredinha vertical.
+sd_furos_dist  = 14;   // entre os centros dos 2 furos (Ø3), medido com régua
+sd_furo_borda  = 6;    // MEDIR: do centro dos furos até a borda da placa do lado dos pinos
+sd_elev        = 7;    // altura da borda de baixo da placa (espaço para os conectores)
+sd_afasta      = 3;    // afastamento entre a paredinha e a placa (soldas e componentes)
 
 // Tela: medidas do desenho do fabricante
 lcd_furos   = [88, 65];   // distância entre os centros dos furos (Ø3)
@@ -79,8 +91,8 @@ p_rele  = [folga, folga];
 p_fonte = [margem_rede, y_sup + folga];
 p_expan = [x_div + div + folga, y_sup + folga];
 x_col   = folga + rele[0] + folga;           // coluna ao lado dos relés
-p_rtc   = [x_col, folga];
-p_sd    = [x_col, folga + rtc[1] + 4];
+p_rtc   = [x_col - 1, folga];
+p_sd    = [x_col + (rtc[0] - sd[0]) / 2, folga + rtc[1] + 21];  // 21 mm livres para os conectores do RTC
 
 W_in = max(p_expan[0] + expan[0] + folga, x_col + max(rtc[0], sd[0]) + folga);
 H_in = max(p_fonte[1] + fonte[1], p_expan[1] + expan[1]) + folga;
@@ -92,9 +104,9 @@ P = D_in + t;                                // altura da base (fundo + interno)
 lcd_c = [W / 2, t + H_in - 12 - lcd[1] / 2];
 enc_c = [lcd_c[0] + 30, lcd_c[1] - lcd[1] / 2 - 24];
 
-// Parafusos de fechamento: canto de baixo à direita e alto da divisória
-// (o canto de cima à direita fica sobre a placa do ESP)
-fech = [[W - t - 4, t + 4], [t + x_div + div / 2, H - t - 4]];
+// Parafusos de fechamento: parede direita, no vão entre o RTC e o microSD, e
+// alto da divisória (os cantos da direita ficam sobre o RTC e a placa do ESP)
+fech = [[W - t - 4, t + folga + rtc[1] + 10], [t + x_div + div / 2, H - t - 4]];
 
 // Dobradiça (lado esquerdo, na borda da tampa)
 r_dob   = 4;
@@ -114,24 +126,30 @@ echo(str("Área interna: ", W_in, " x ", H_in, " x ", D_in, " mm"));
 // --------------------------------------------------------------------------
 // Peças auxiliares
 // --------------------------------------------------------------------------
-module suportes(pos, furos, d_furo = d_auto_m3) {
+module suportes(pos, furos, d_furo = d_auto_m3, d_ext = d_suporte) {
   for (f = furos)
     translate([pos[0] + f[0], pos[1] + f[1], 0])
       difference() {
-        cylinder(d = d_suporte, h = alt_suporte);
+        cylinder(d = d_ext, h = alt_suporte);
         translate([0, 0, 1]) cylinder(d = d_furo, h = alt_suporte);
       }
 }
 
-// Berço para módulos sem furo: moldura baixa onde a placa encaixa
-// (prender com fita dupla face ou abraçadeira)
-module berco(pos, m, alt = 6, parede = 1.6) {
-  translate([pos[0] - parede - 0.3, pos[1] - parede - 0.3, 0])
+// Paredinha do microSD: a placa fica em pé, encostada em duas nervuras, e é
+// presa por 2 parafusos M2.5 horizontais. Imprime sem suporte.
+module suporte_sd() {
+  z_furo = sd_elev + sd_furo_borda;
+  translate([p_sd[0], p_sd[1], 0])
     difference() {
-      cube([m[0] + 2 * parede + 0.6, m[1] + 2 * parede + 0.6, alt]);
-      translate([parede, parede, -1]) cube([m[0] + 0.6, m[1] + 0.6, alt + 2]);
-      // aberturas para os fios
-      translate([-1, (m[1] + 2 * parede) / 2 - 5, 2]) cube([m[0] + 2 * parede + 3, 10, alt]);
+      union() {
+        translate([-2, 0, 0]) cube([sd[0] + 4, div, z_furo + 5]);
+        for (sx = [-1, 1])
+          translate([sd[0] / 2 + sx * sd_furos_dist / 2 - 2.5, div - 0.01, 0])
+            cube([5, sd_afasta + 0.01, z_furo + 3.5]);
+      }
+      for (sx = [-1, 1])
+        translate([sd[0] / 2 + sx * sd_furos_dist / 2, -1, z_furo])
+          rotate([-90, 0, 0]) cylinder(d = d_auto_m25, h = div + sd_afasta + 2);
     }
 }
 
@@ -175,8 +193,8 @@ module base() {
       translate([t, t, t]) {
         suportes(p_rele, furos_rele);
         suportes(p_expan, furos_expan);
-        berco(p_rtc, rtc);
-        berco(p_sd, sd);
+        suportes(p_rtc, furos_rtc, d_auto_m25, 5);
+        suporte_sd();
       }
       // ressaltos dos parafusos de fechamento
       // d = 9: invade 0,5 mm a parede (tangente gera sólido inválido)
@@ -277,8 +295,11 @@ module modulos(com_tela = true) {
     color("SteelBlue") translate([p_rele[0], p_rele[1], alt_suporte]) cube(rele);
     color("Silver") translate([p_fonte[0], p_fonte[1], 0]) cube(fonte);
     color("MediumSeaGreen") translate([p_expan[0], p_expan[1], alt_suporte]) cube(expan);
-    color("Orange") translate([p_rtc[0], p_rtc[1], 1]) cube(rtc);
-    color("MediumPurple") translate([p_sd[0], p_sd[1], 1]) cube(sd);
+    color("Orange") translate([p_rtc[0], p_rtc[1], alt_suporte]) cube(rtc);
+    translate([p_sd[0], p_sd[1] + div + sd_afasta, sd_elev]) {
+      color("MediumPurple") cube([sd[0], sd[2], sd[1]]);
+      color("White") translate([(sd[0] - 11) / 2, 2, sd[1]]) cube([11, 1, sd_cartao - sd[1]]);
+    }
   }
   if (com_tela) tela();
 }
