@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle
 # mesmos parâmetros do caixa.scad
 t=2.4; folga=3; div=2.4; D_in=65; margem=12
-rele=(180,90,20); fonte=(99,131,40); expan=(90,130,30); rtc=(17,38,22); sd=(24,42,6); lcd=(93,70,13.5)
+rele=(180,90,20); fonte=(99,131,40); expan=(90,130,30); rtc=(22,38,17); sd=(17.5,18.5,5); lcd=(93,70,13.5)
 inset=3.5
 h_inf=rele[1]+2*folga; y_sup=h_inf+div; x_div=margem+fonte[0]+folga
 p_rele=(folga,folga); p_fonte=(margem,y_sup+folga); p_expan=(x_div+div+folga,y_sup+folga)
-x_col=folga+rele[0]+folga; p_rtc=(x_col,folga); p_sd=(x_col,folga+rtc[1]+4)
+x_col=folga+rele[0]+folga; p_rtc=(x_col,folga); p_sd=(x_col+(rtc[0]-sd[0])/2,folga+rtc[1]+21)
 W_in=max(p_expan[0]+expan[0]+folga, x_col+max(rtc[0],sd[0])+folga)
 H_in=max(p_fonte[1]+fonte[1], p_expan[1]+expan[1])+folga
 W=W_in+2*t; H=H_in+2*t; P=D_in+t
@@ -39,8 +39,10 @@ cantos=lambda m,i=inset:[(i,i),(m[0]-i,i),(i,m[1]-i),(m[0]-i,m[1]-i)]
 mod(p_rele,rele,"#7FA7D9","Relés (16)",cantos(rele))
 mod(p_fonte,fonte,"#B9B9B9","Fonte 5 V 10 A\n(rede elétrica)",[(c[0],c[1]) for c in cantos(fonte,10)],d=3.4)
 mod(p_expan,expan,"#8CC7A1","ESP32-S3\n+ expansão",cantos(expan))
-mod(p_rtc,rtc,"#F2B36B","RTC")
-mod(p_sd,sd,"#B79AD9","SD")
+mod(p_rtc,rtc,"#F2B36B","RTC",[(1.7,3.4),(1.7,28.8),(20.2,28.8)],d=5)
+ax.add_patch(Rectangle((t+p_sd[0]-2,t+p_sd[1]),sd[0]+4,div+3,fc="#555",ec="none"))
+ax.add_patch(Rectangle((t+p_sd[0],t+p_sd[1]+div+3),sd[0],sd[2],fc="#B79AD9",ec="#333",lw=1))
+ax.text(t+p_sd[0]+sd[0]/2,t+p_sd[1]+div+3+sd[2]+2,"SD em pé",ha="center",va="bottom",fontsize=8)
 for f in fech: ax.add_patch(Circle(f,4,fc="#666",ec="none"))
 # prensa-cabos
 for x,d,n in [(t+3+45,15.5,"PG9 válvulas"),(t+3+135,15.5,"PG9 válvulas/bomba"),(t+x_col+12,12.5,"PG7 sensores")]:
