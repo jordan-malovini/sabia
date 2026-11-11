@@ -54,6 +54,8 @@ Os itens marcados **MEDIR** no `caixa.scad` são estimativas. Com um paquímetro
 
 O **RTC** fica deitado sobre 3 suportes, com a pilha virada para a frente, para dar para trocar. O **microSD** (18,5 × 17,5 mm, furos a 14 mm) fica em pé, parafusado numa paredinha: o cartão aponta para a tampa e sai puxando para fora, e os pinos apontam para o ESP.
 
+![microSD em pé e RTC, vistos do lado do ESP](../hardware/caixa-3d/render-sd-rtc.png)
+
 Depois de trocar as medidas, rode `python3 tools/leiaute_caixa.py` para atualizar o desenho do leiaute. Esse script repete os parâmetros do `.scad`, então mude nos dois.
 
 ## Material de montagem

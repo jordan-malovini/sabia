@@ -45,10 +45,3 @@ jobs:
           name: caixa-3d
           path: hardware/caixa-3d/saida/
           retention-days: 30
-      - name: Prévias no log (temporário)
-        run: |
-          v() { xvfb-run -a openscad -D "parte=\"$2\"" --preview $3 --imgsize=900,700 --colorscheme=Tomorrow -o /tmp/p-$1.png caixa.scad >/dev/null 2>&1; echo "PREVIA-INICIO $1"; base64 -w0 /tmp/p-$1.png; echo; echo "PREVIA-FIM $1"; }
-          v zoom2 por_dentro "--camera=200,45,15,60,0,200,230"
-          v por_dentro por_dentro "--viewall --autocenter"
-          v montagem montagem "--viewall --autocenter"
-          v aberta aberta "--viewall --autocenter"
