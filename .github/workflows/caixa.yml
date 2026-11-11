@@ -36,8 +36,8 @@ jobs:
           done
       - name: Gerar imagens
         run: |
-          for p in montagem aberta base tampa; do
-            xvfb-run -a openscad -D "parte=\"$p\"" --render --viewall --autocenter --imgsize=1600,1200 \
+          for p in por_dentro montagem aberta base tampa; do
+            xvfb-run -a openscad -D "parte=\"$p\"" --preview --viewall --autocenter --imgsize=1600,1200 \
               --colorscheme=Tomorrow -o saida/sabia-caixa-$p.png caixa.scad
           done
       - uses: actions/upload-artifact@v4
@@ -45,3 +45,10 @@ jobs:
           name: caixa-3d
           path: hardware/caixa-3d/saida/
           retention-days: 30
+      - name: Prévias no log (temporário)
+        run: |
+          for p in por_dentro montagem aberta; do
+            xvfb-run -a openscad -D "parte=\"$p\"" --preview --viewall --autocenter --imgsize=900,700 \
+              --colorscheme=Tomorrow -o /tmp/p-$p.png caixa.scad >/dev/null 2>&1
+            echo "PREVIA-INICIO $p"; base64 -w0 /tmp/p-$p.png; echo; echo "PREVIA-FIM $p"
+          done
