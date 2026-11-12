@@ -140,10 +140,14 @@ static void desenharEstado(Controlador& c, const DadosTela& d, uint32_t agoraMs)
   tela.setFont(u8g2_font_6x10_tf);
   if (c.setorAtivo() != 0) {
     uint32_t r = c.restanteS();
-    const char* fase = c.estado() == Estado::Regando ? "regando"
-                     : c.estado() == Estado::AbrindoValvula ? "abrindo" : "fechando";
-    snprintf(linha, sizeof(linha), "%s %lu:%02lu", fase, static_cast<unsigned long>(r / 60),
-             static_cast<unsigned long>(r % 60));
+    if (c.estado() == Estado::Trocando) {
+      snprintf(linha, sizeof(linha), "trocando para o %u", c.proximoSetor());
+    } else {
+      const char* fase = c.estado() == Estado::Regando ? "regando"
+                       : c.estado() == Estado::AbrindoValvula ? "abrindo" : "fechando";
+      snprintf(linha, sizeof(linha), "%s %lu:%02lu", fase, static_cast<unsigned long>(r / 60),
+               static_cast<unsigned long>(r % 60));
+    }
     centralizar(linha, 42);
   } else if (c.estado() == Estado::Pausa) {
     centralizar("pausa entre setores", 42);
@@ -156,7 +160,7 @@ static void desenharEstado(Controlador& c, const DadosTela& d, uint32_t agoraMs)
     for (size_t i = 0; i < c.tamanhoFila() && n < static_cast<int>(sizeof(linha)) - 3; i++)
       n += snprintf(linha + n, sizeof(linha) - n, " %u", c.itemFila(i).setor);
     centralizar(linha, 53);
-  } else if (c.estado() == Estado::Regando) {
+  } else if (c.estado() == Estado::Regando || c.estado() == Estado::Trocando) {
     centralizar("Bomba ligada", 53);
   }
 

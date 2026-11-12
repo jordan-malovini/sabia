@@ -19,9 +19,9 @@
 | --- | --- |
 | RF01 | Controlar 8 setores individualmente, cada um com tipo (gotejo ou aspersão), horário e duração. |
 | RF02 | Operar em dois modos: individual (horários por setor) e ciclo (setores em sequência). |
-| RF03 | Ligar um setor por vez: pedidos sobrepostos entram em fila, com pausa curta entre os setores. |
+| RF03 | Regar um setor por vez: pedidos sobrepostos entram em fila. Na troca entre setores, a válvula do próximo abre 2 s antes de a do atual fechar. |
 | RF04 | Permitir comando manual: ligar, parar, pular setor e parar tudo. |
-| RF05 | Comandar a bomba: ligar depois que a válvula abre e desligar antes de ela fechar. |
+| RF05 | Comandar a bomba: ligar depois que a válvula abre, desligar antes de a última fechar e **permanecer ligada** durante toda a fila, sem ligar e desligar a cada setor. |
 | RF06 | Medir a chuva com pluviômetro basculante e registrar em intervalos de 10 min enquanto chove, com totais por hora, dia e mês. |
 | RF07 | Medir temperatura, umidade, pressão e luz. |
 | RF08 | Calcular o balanço hídrico por setor, converter o déficit em tempo de rega e adiar a rega quando choveu. |

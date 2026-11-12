@@ -54,7 +54,7 @@ flowchart LR
 ## Princípios
 
 1. O controle nunca depende da rede.
-2. Só um relé de setor acionado por vez.
+2. Um setor regando por vez. Duas válvulas só ficam abertas juntas durante os 2 s da troca entre setores.
 3. Na dúvida, desligado. No boot, o nível de desligado é escrito em cada pino antes de ele virar saída (a placa de relés costuma ser ativa em nível baixo). Depois de uma queda de energia, nenhuma rega é retomada. Se o firmware travar, o watchdog reinicia o ESP com tudo desligado.
 
 ## Lógica de irrigação
@@ -89,7 +89,9 @@ O Hargreaves foi escolhido porque só precisa de temperatura, que é a medida ma
 1. A válvula do setor abre.
 2. Depois de cerca de 2 s, a bomba liga.
 3. No fim, a bomba desliga e só então a válvula fecha.
-4. Uma pausa de 2 a 5 s separa um setor do próximo, e o setor seguinte vem da fila.
+4. Se a fila acabou, a pausa de 3 s impede que a bomba religue logo em seguida.
+
+**Troca entre setores da fila (ciclo):** a bomba não desliga. A válvula do próximo setor abre, as duas ficam abertas por 2 s (sobreposição, contra o golpe de aríete) e só então a válvula do setor que terminou fecha. Assim a bomba liga uma vez só para a fila inteira e nunca trabalha contra todas as válvulas fechadas. A mesma troca acontece ao pular um setor.
 
 ```mermaid
 sequenceDiagram

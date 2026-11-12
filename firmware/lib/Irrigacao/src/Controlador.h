@@ -4,8 +4,11 @@
 // uma interface. Assim ela roda igual no ESP32, no Wokwi e nos testes do PC.
 //
 // Garantias:
-//  - no máximo um setor aberto por vez (RF03);
-//  - a bomba só liga com a válvula aberta e desliga antes de ela fechar (RF05);
+//  - um setor regando por vez (RF03). Na troca entre setores da fila, a válvula
+//    do próximo abre antes de a do atual fechar (sobreposição) e a bomba
+//    continua ligada: ela não fica ligando e desligando a cada setor, e nunca
+//    trabalha contra todas as válvulas fechadas;
+//  - a bomba só liga com uma válvula aberta e desliga antes de a última fechar (RF05);
 //  - nenhuma rega passa do tempo máximo configurado (RF13).
 
 #pragma once
@@ -29,7 +32,8 @@ class Saidas {
 struct Config {
   uint32_t atrasoBombaMs = 2000;          // válvula abre -> bomba liga
   uint32_t atrasoFechamentoMs = 1000;     // bomba desliga -> válvula fecha
-  uint32_t pausaEntreSetoresMs = 3000;    // entre um setor e o próximo
+  uint32_t sobreposicaoMs = 2000;         // troca: as duas válvulas abertas, bomba ligada
+  uint32_t pausaEntreSetoresMs = 3000;    // depois de a bomba desligar, antes de religar
   uint32_t tempoMaximoS = 60UL * 60UL;    // limite de uma rega (RF13)
 };
 
@@ -37,8 +41,9 @@ enum class Estado : uint8_t {
   Ocioso,           // nada ligado
   AbrindoValvula,   // válvula aberta, esperando para ligar a bomba
   Regando,          // válvula e bomba ligadas
+  Trocando,         // válvula atual e a próxima abertas, bomba ligada
   FechandoValvula,  // bomba desligada, esperando para fechar a válvula
-  Pausa,            // tudo desligado, intervalo antes do próximo setor
+  Pausa,            // tudo desligado, intervalo antes de religar a bomba
 };
 
 enum class Resultado : uint8_t {
@@ -68,7 +73,7 @@ class Controlador {
   // Retorna quantos setores entraram na fila.
   uint8_t iniciarCiclo(const uint32_t duracoesS[NUM_SETORES]);
 
-  void pular();                 // encerra o setor atual e segue a fila
+  void pular();                 // encerra o setor atual e segue a fila (sem desligar a bomba)
   bool parar(uint8_t setor);    // encerra ou tira da fila um setor
   void pararTudo();             // esvazia a fila e encerra o setor atual
 
@@ -77,6 +82,7 @@ class Controlador {
 
   Estado estado() const { return estado_; }
   uint8_t setorAtivo() const { return atual_.setor; }  // 0 se nenhum
+  uint8_t proximoSetor() const { return proximo_.setor; }  // só durante a troca
   uint32_t restanteS() const;
   size_t tamanhoFila() const { return tamanho_; }
   Pedido itemFila(size_t indice) const;
@@ -95,7 +101,10 @@ class Controlador {
   uint32_t inicioEstadoMs_ = 0;
   uint32_t ultimoTickMs_ = 0;
   Pedido atual_ = {0, 0};
-  bool encerrar_ = false;
+  Pedido proximo_ = {0, 0};   // setor que está entrando, durante a troca
+  bool encerrar_ = false;     // encerrar o setor atual
+  bool pularProximo_ = false; // encerrar o setor que está entrando, assim que entrar
+  bool abortar_ = false;      // parar tudo
 
   Pedido fila_[CAPACIDADE_FILA] = {};
   size_t tamanho_ = 0;

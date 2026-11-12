@@ -31,7 +31,7 @@ O projeto substitui um controlador antigo que só trabalhava em ciclo e exigia i
 ## Princípios de projeto
 
 1. O controle nunca depende da rede.
-2. Só um setor ligado por vez.
+2. Um setor regando por vez, com a bomba ligada do começo ao fim da fila.
 3. Na dúvida, desligado: as saídas ficam desligadas desde o boot, nenhuma rega é retomada após queda de energia, e o watchdog reinicia o sistema se o firmware travar.
 
 ## Estado atual

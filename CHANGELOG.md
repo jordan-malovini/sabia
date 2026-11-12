@@ -21,6 +21,7 @@ Formato: uma seção por versão, da mais nova para a mais antiga.
 - Interface local: tela de 128x64 com a logo no boot, tela de estado e menu pelo encoder (escolher o setor, depois o tempo). Relógio e contagem de chuva do pluviômetro na tela.
 - Simulação no Wokwi com tela, encoder, relógio e botão de pluviômetro.
 - Monitor serial com eco do que é digitado e o comando `l` em duas etapas.
+- Troca entre setores com sobreposição de 2 s e a bomba ligada do começo ao fim da fila (ideia do controlador antigo), em vez de desligar a bomba a cada setor.
 - Nome do projeto: SABIÁ (Sistema Automático de Balanço e Irrigação Agrícola).
 - Documentação dividida em README e `docs/` (requisitos, arquitetura, hardware e mapa de pinos).
 - Requisitos de segurança RF14 (saídas desligadas no boot), RF15 (watchdog) e RF16 (senha e autenticação na página web).
