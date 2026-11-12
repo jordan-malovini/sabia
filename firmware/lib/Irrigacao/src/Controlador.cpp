@@ -10,7 +10,8 @@ void Controlador::iniciar() {
   for (uint8_t s = 1; s <= NUM_SETORES; s++) saidas_.valvula(s, false);
   estado_ = Estado::Ocioso;
   atual_ = {0, 0};
-  encerrar_ = false;
+  proximo_ = {0, 0};
+  encerrar_ = pularProximo_ = abortar_ = false;
   tamanho_ = 0;
 }
 
@@ -20,7 +21,8 @@ Resultado Controlador::pedir(uint8_t setor, uint32_t duracaoS) {
   if (duracaoS > config_.tempoMaximoS) duracaoS = config_.tempoMaximoS;
 
   // Um setor que já está regando (e não está sendo encerrado) não entra de novo.
-  if (setor == atual_.setor && !encerrar_) return Resultado::JaNaFila;
+  if (setor == atual_.setor && !encerrar_ && estado_ != Estado::Trocando) return Resultado::JaNaFila;
+  if (setor == proximo_.setor) return Resultado::JaNaFila;
   if (naFila(setor)) return Resultado::JaNaFila;
   if (tamanho_ >= CAPACIDADE_FILA) return Resultado::FilaCheia;
 
@@ -37,12 +39,17 @@ uint8_t Controlador::iniciarCiclo(const uint32_t duracoesS[NUM_SETORES]) {
 }
 
 void Controlador::pular() {
-  if (atual_.setor != 0) encerrar_ = true;
+  // Durante a troca o setor atual já está saindo: não há o que pular.
+  if (atual_.setor != 0 && estado_ != Estado::Trocando) encerrar_ = true;
 }
 
 bool Controlador::parar(uint8_t setor) {
   if (setor != 0 && setor == atual_.setor) {
-    encerrar_ = true;
+    if (estado_ != Estado::Trocando) encerrar_ = true;
+    return true;
+  }
+  if (setor != 0 && setor == proximo_.setor) {
+    pularProximo_ = true;
     return true;
   }
   for (size_t i = 0; i < tamanho_; i++) {
@@ -56,7 +63,10 @@ bool Controlador::parar(uint8_t setor) {
 
 void Controlador::pararTudo() {
   tamanho_ = 0;
-  pular();
+  if (atual_.setor != 0) {
+    encerrar_ = true;
+    abortar_ = true;
+  }
 }
 
 void Controlador::tick(uint32_t agoraMs) {
@@ -79,16 +89,41 @@ void Controlador::tick(uint32_t agoraMs) {
 
     case Estado::Regando:
       if (encerrar_ || decorrido(agoraMs) >= atual_.duracaoS * 1000UL) {
+        if (tamanho_ > 0 && !abortar_) {
+          // Há um próximo setor: abre a válvula dele com a bomba ligada.
+          proximo_ = fila_[0];
+          removerDaFila(0);
+          saidas_.valvula(proximo_.setor, true);
+          mudar(Estado::Trocando, agoraMs);
+        } else {
+          saidas_.bomba(false);
+          mudar(Estado::FechandoValvula, agoraMs);
+        }
+      }
+      break;
+
+    case Estado::Trocando:
+      if (abortar_) {
+        // Parar tudo no meio da troca: desliga a bomba e fecha as duas válvulas.
         saidas_.bomba(false);
         mudar(Estado::FechandoValvula, agoraMs);
+      } else if (decorrido(agoraMs) >= config_.sobreposicaoMs) {
+        saidas_.valvula(atual_.setor, false);
+        atual_ = proximo_;
+        proximo_ = {0, 0};
+        encerrar_ = pularProximo_;
+        pularProximo_ = false;
+        mudar(Estado::Regando, agoraMs);
       }
       break;
 
     case Estado::FechandoValvula:
       if (decorrido(agoraMs) >= config_.atrasoFechamentoMs) {
         saidas_.valvula(atual_.setor, false);
+        if (proximo_.setor != 0) saidas_.valvula(proximo_.setor, false);
         atual_ = {0, 0};
-        encerrar_ = false;
+        proximo_ = {0, 0};
+        encerrar_ = pularProximo_ = abortar_ = false;
         mudar(Estado::Pausa, agoraMs);
       }
       break;
@@ -150,6 +185,7 @@ const char* nomeEstado(Estado estado) {
     case Estado::Ocioso: return "ocioso";
     case Estado::AbrindoValvula: return "abrindo valvula";
     case Estado::Regando: return "regando";
+    case Estado::Trocando: return "trocando de setor";
     case Estado::FechandoValvula: return "fechando valvula";
     case Estado::Pausa: return "pausa";
   }

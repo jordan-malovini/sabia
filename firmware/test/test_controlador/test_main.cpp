@@ -13,13 +13,18 @@ class SaidasFalsas : public Saidas {
   bool valvulas[NUM_SETORES + 1] = {};
   bool bombaLigada = false;
   int aberturas[NUM_SETORES + 1] = {};
+  int partidas = 0;  // quantas vezes a bomba ligou
 
   void valvula(uint8_t setor, bool aberta) override {
     TEST_ASSERT_TRUE_MESSAGE(setor >= 1 && setor <= NUM_SETORES, "setor fora da faixa");
     if (!aberta) {
-      TEST_ASSERT_FALSE_MESSAGE(bombaLigada && valvulas[setor], "valvula fechou com a bomba ligada");
+      // A bomba nunca pode ficar ligada contra todas as válvulas fechadas.
+      TEST_ASSERT_FALSE_MESSAGE(bombaLigada && valvulas[setor] && abertas() == 1,
+                                "ultima valvula fechou com a bomba ligada");
     } else {
-      TEST_ASSERT_EQUAL_MESSAGE(0, abertas(), "duas valvulas abertas ao mesmo tempo");
+      // Duas válvulas só na troca de setor, com a bomba ligada; nunca três.
+      if (abertas() >= 1) TEST_ASSERT_TRUE_MESSAGE(bombaLigada, "segunda valvula abriu com a bomba desligada");
+      TEST_ASSERT_TRUE_MESSAGE(abertas() <= 1, "tres valvulas abertas ao mesmo tempo");
       aberturas[setor]++;
     }
     valvulas[setor] = aberta;
@@ -27,6 +32,7 @@ class SaidasFalsas : public Saidas {
 
   void bomba(bool ligada) override {
     if (ligada) TEST_ASSERT_EQUAL_MESSAGE(1, abertas(), "bomba ligou sem valvula aberta");
+    if (ligada && !bombaLigada) partidas++;
     bombaLigada = ligada;
   }
 
@@ -42,6 +48,7 @@ static Config configTeste() {
   c.atrasoBombaMs = 2000;
   c.atrasoFechamentoMs = 1000;
   c.pausaEntreSetoresMs = 3000;
+  c.sobreposicaoMs = 2000;
   c.tempoMaximoS = 600;
   return c;
 }
@@ -100,6 +107,74 @@ void test_fila_um_setor_por_vez() {
   TEST_ASSERT_EQUAL(1, s.aberturas[2]);
   TEST_ASSERT_EQUAL(1, s.aberturas[3]);
   TEST_ASSERT_EQUAL(Estado::Ocioso, c.estado());
+  TEST_ASSERT_EQUAL_MESSAGE(1, s.partidas, "a bomba deve ligar uma vez so para a fila inteira");
+}
+
+void test_troca_com_sobreposicao() {
+  SaidasFalsas s;
+  Controlador c(s, configTeste());
+  c.iniciar();
+
+  c.pedir(1, 5);
+  c.pedir(2, 5);
+  c.tick(agora);
+  avancar(c, 2000 + 5000);            // abre, liga a bomba e rega 5 s
+  TEST_ASSERT_EQUAL(Estado::Trocando, c.estado());
+  TEST_ASSERT_TRUE(s.valvulas[1]);
+  TEST_ASSERT_TRUE(s.valvulas[2]);    // as duas abertas na troca
+  TEST_ASSERT_TRUE(s.bombaLigada);    // e a bomba continua ligada
+
+  avancar(c, 2000);
+  TEST_ASSERT_FALSE(s.valvulas[1]);
+  TEST_ASSERT_TRUE(s.valvulas[2]);
+  TEST_ASSERT_TRUE(s.bombaLigada);
+  TEST_ASSERT_EQUAL(2, c.setorAtivo());
+  TEST_ASSERT_EQUAL(5, c.restanteS());
+
+  avancar(c, 5000 + 1000 + 100);      // último setor: bomba desliga, depois a válvula fecha
+  TEST_ASSERT_FALSE(s.bombaLigada);
+  TEST_ASSERT_EQUAL(0, s.abertas());
+  TEST_ASSERT_EQUAL(1, s.partidas);
+}
+
+void test_parar_tudo_durante_a_troca() {
+  SaidasFalsas s;
+  Controlador c(s, configTeste());
+  c.iniciar();
+
+  c.pedir(1, 5);
+  c.pedir(2, 5);
+  c.pedir(3, 5);
+  c.tick(agora);
+  avancar(c, 2000 + 5000 + 500);
+  TEST_ASSERT_EQUAL(Estado::Trocando, c.estado());
+
+  c.pararTudo();
+  avancar(c, 100);
+  TEST_ASSERT_FALSE(s.bombaLigada);
+  avancar(c, 1000);
+  TEST_ASSERT_EQUAL(0, s.abertas());
+  avancar(c, 10000);
+  TEST_ASSERT_EQUAL(Estado::Ocioso, c.estado());
+  TEST_ASSERT_EQUAL(0, s.aberturas[3]);
+}
+
+void test_parar_o_setor_que_esta_entrando() {
+  SaidasFalsas s;
+  Controlador c(s, configTeste());
+  c.iniciar();
+
+  c.pedir(1, 5);
+  c.pedir(2, 50);
+  c.pedir(3, 5);
+  c.tick(agora);
+  avancar(c, 2000 + 5000 + 500);
+  TEST_ASSERT_EQUAL(2, c.proximoSetor());
+  TEST_ASSERT_TRUE(c.parar(2));       // o 2 entra e sai em seguida, direto para o 3
+  avancar(c, 2000 + 2000 + 500);
+  TEST_ASSERT_EQUAL(3, c.setorAtivo());
+  TEST_ASSERT_TRUE(s.bombaLigada);
+  TEST_ASSERT_EQUAL(1, s.partidas);
 }
 
 void test_setor_repetido_nao_entra() {
@@ -146,9 +221,11 @@ void test_pular_segue_a_fila() {
 
   c.pular();
   avancar(c, 100);
-  TEST_ASSERT_FALSE(s.bombaLigada);
-  avancar(c, 1000 + 3000 + 100);
+  TEST_ASSERT_TRUE(s.bombaLigada);    // pular não desliga a bomba: troca com sobreposição
+  avancar(c, 2000);
   TEST_ASSERT_EQUAL(2, c.setorAtivo());
+  TEST_ASSERT_FALSE(s.valvulas[1]);
+  TEST_ASSERT_EQUAL(1, s.partidas);
 }
 
 void test_pular_antes_da_bomba() {
@@ -244,6 +321,9 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_sequencia_valvula_bomba);
   RUN_TEST(test_fila_um_setor_por_vez);
+  RUN_TEST(test_troca_com_sobreposicao);
+  RUN_TEST(test_parar_tudo_durante_a_troca);
+  RUN_TEST(test_parar_o_setor_que_esta_entrando);
   RUN_TEST(test_setor_repetido_nao_entra);
   RUN_TEST(test_pedidos_invalidos);
   RUN_TEST(test_tempo_maximo);
