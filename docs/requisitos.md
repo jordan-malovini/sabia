@@ -33,6 +33,10 @@
 | RF14 | Manter todas as saídas desligadas desde o boot: o nível de desligado é escrito antes de o pino virar saída. |
 | RF15 | Usar o watchdog do ESP32 para reiniciar o sistema, com todas as saídas desligadas, se o firmware travar. |
 | RF16 | Proteger os comandos: senha no Wi-Fi próprio (AP) e autenticação na página para ligar, parar e alterar ajustes. |
+| RF17 | Agendar as regas em 3 programas (A, B, C), cada um com até 4 horários de início, dias de rega (semana, ímpares, pares ou intervalo), tempo por setor e ajuste percentual. |
+| RF18 | Empilhar programas com horários sobrepostos: o segundo espera o primeiro terminar. |
+| RF19 | Permitir pausar as regas por chuva, de 1 a 14 dias, com retorno automático. |
+| RF20 | Guardar a agenda na memória não volátil do ESP e mostrar a próxima rega na tela. |
 
 ## Requisitos não funcionais
 

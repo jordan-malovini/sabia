@@ -70,17 +70,20 @@ static Clique lerBotao(uint32_t agoraMs) {
 // ---------------------------------------------------------------------------
 // Telas
 // ---------------------------------------------------------------------------
-enum class Tela : uint8_t { Boot, Estado, Menu, Duracao };
+enum class Tela : uint8_t { Boot, Estado, Menu, Duracao, Chuva };
 
 static const uint8_t ITEM_CICLO = NUM_SETORES;
-static const uint8_t ITEM_PARAR = NUM_SETORES + 1;
-static const uint8_t ITEM_VOLTAR = NUM_SETORES + 2;
-static const uint8_t NUM_ITENS = NUM_SETORES + 3;
+static const uint8_t ITEM_PROGRAMA = NUM_SETORES + 1;  // um item por programa (A, B, C)
+static const uint8_t ITEM_CHUVA = ITEM_PROGRAMA + NUM_PROGRAMAS;
+static const uint8_t ITEM_PARAR = ITEM_CHUVA + 1;
+static const uint8_t ITEM_VOLTAR = ITEM_CHUVA + 2;
+static const uint8_t NUM_ITENS = ITEM_CHUVA + 3;
 
 static Tela telaAtual = Tela::Boot;
 static uint8_t itemMenu = 0;
 static uint8_t itemEscolhido = 0;
 static uint8_t indiceDuracao = DURACAO_PADRAO;
+static uint8_t diasChuva = 1;
 static uint32_t ultimaAcaoMs = 0, ultimoDesenhoMs = 0, inicioMs = 0;
 static bool redesenhar = true;
 static char aviso[24] = "";
@@ -103,6 +106,8 @@ static const char* textoResultado(Resultado r) {
 static void nomeItem(uint8_t item, char* saida, size_t tamanho) {
   if (item < NUM_SETORES) snprintf(saida, tamanho, "Setor %u", item + 1);
   else if (item == ITEM_CICLO) strlcpy(saida, "Ciclo (todos)", tamanho);
+  else if (item < ITEM_CHUVA) snprintf(saida, tamanho, "Programa %c agora", 'A' + (item - ITEM_PROGRAMA));
+  else if (item == ITEM_CHUVA) strlcpy(saida, "Pausa por chuva", tamanho);
   else if (item == ITEM_PARAR) strlcpy(saida, "Parar tudo", tamanho);
   else strlcpy(saida, "Voltar", tamanho);
 }
@@ -119,7 +124,7 @@ static void desenharBoot() {
   tela.drawStr(72, 44, "v" SABIA_VERSAO);
 }
 
-static void desenharEstado(Controlador& c, const DadosTela& d, uint32_t agoraMs) {
+static void desenharEstado(Controlador& c, Agenda& agenda, const DadosTela& d, uint32_t agoraMs) {
   char linha[32];
   tela.setFont(u8g2_font_6x10_tf);
   if (d.temHora) snprintf(linha, sizeof(linha), "%02u:%02u %02u/%02u", d.hora, d.minuto, d.dia, d.mes);
@@ -150,7 +155,25 @@ static void desenharEstado(Controlador& c, const DadosTela& d, uint32_t agoraMs)
     }
     centralizar(linha, 42);
   } else if (c.estado() == Estado::Pausa) {
-    centralizar("pausa entre setores", 42);
+    centralizar("aguardando", 42);
+  } else if (d.temHora) {
+    // Parado: mostra a próxima rega da agenda.
+    uint8_t prog = 0, susp = agenda.diasSuspensos(d.agora);
+    uint16_t minuto = 0;
+    uint32_t faltam = 0;
+    if (agenda.proximoInicio(d.agora, prog, minuto, faltam)) {
+      if (faltam < 24 * 60) snprintf(linha, sizeof(linha), "Prox %c %02u:%02u (%luh%02lu)", 'A' + prog, minuto / 60, minuto % 60,
+                                     static_cast<unsigned long>(faltam / 60), static_cast<unsigned long>(faltam % 60));
+      else snprintf(linha, sizeof(linha), "Prox %c %02u:%02u (%lu d)", 'A' + prog, minuto / 60, minuto % 60,
+                    static_cast<unsigned long>(faltam / 1440));
+      centralizar(linha, 42);
+    } else {
+      centralizar("Sem regas agendadas", 42);
+    }
+    if (susp > 0 && agoraMs >= avisoAteMs) {
+      snprintf(linha, sizeof(linha), "Chuva: pausa de %u d", susp);
+      centralizar(linha, 53);
+    }
   }
 
   if (agoraMs < avisoAteMs) {
@@ -203,6 +226,20 @@ static void desenharDuracao() {
   centralizar("gire: tempo  clique: ligar", 63);
 }
 
+static void desenharChuva() {
+  char linha[24];
+  tela.setFont(u8g2_font_6x10_tf);
+  tela.drawStr(0, 8, "Pausa por chuva");
+  tela.drawHLine(0, 11, 128);
+  centralizar("Nao regar por", 25);
+  tela.setFont(u8g2_font_helvB12_tf);
+  if (diasChuva == 0) strlcpy(linha, "cancelar", sizeof(linha));
+  else snprintf(linha, sizeof(linha), "%u %s", diasChuva, diasChuva == 1 ? "dia" : "dias");
+  centralizar(linha, 44);
+  tela.setFont(u8g2_font_5x8_tf);
+  centralizar("gire: dias  clique: ok", 63);
+}
+
 void interfaceIniciar() {
   pinMode(PINO_ENCODER_A, INPUT_PULLUP);
   pinMode(PINO_ENCODER_B, INPUT_PULLUP);
@@ -213,7 +250,8 @@ void interfaceIniciar() {
   inicioMs = millis();
 }
 
-void interfaceAtualizar(Controlador& c, const DadosTela& d, uint32_t agoraMs) {
+bool interfaceAtualizar(Controlador& c, Agenda& agenda, const DadosTela& d, uint32_t agoraMs) {
+  bool agendaMudou = false;
   int32_t passos = lerPassos();
   Clique clique = lerBotao(agoraMs);
   if (passos != 0 || clique != Clique::Nenhum) { ultimaAcaoMs = agoraMs; redesenhar = true; }
@@ -236,10 +274,38 @@ void interfaceAtualizar(Controlador& c, const DadosTela& d, uint32_t agoraMs) {
         c.pararTudo();
         avisar("Parando tudo", agoraMs);
         telaAtual = Tela::Estado;
+      } else if (clique == Clique::Curto && itemMenu >= ITEM_PROGRAMA && itemMenu < ITEM_CHUVA) {
+        uint8_t prog = itemMenu - ITEM_PROGRAMA;
+        if (agenda.iniciarPrograma(prog)) {
+          char texto[24];
+          snprintf(texto, sizeof(texto), "Programa %c iniciado", 'A' + prog);
+          avisar(texto, agoraMs);
+        } else {
+          avisar("Programa sem setores", agoraMs);
+        }
+        telaAtual = Tela::Estado;
+      } else if (clique == Clique::Curto && itemMenu == ITEM_CHUVA) {
+        diasChuva = agenda.diasSuspensos(d.agora) > 0 ? 0 : 1;
+        telaAtual = Tela::Chuva;
       } else if (clique == Clique::Curto) {
         itemEscolhido = itemMenu;
         indiceDuracao = DURACAO_PADRAO;
         telaAtual = Tela::Duracao;
+      }
+      break;
+
+    case Tela::Chuva:
+      if (passos != 0) {
+        int32_t novo = static_cast<int32_t>(diasChuva) + passos;
+        diasChuva = static_cast<uint8_t>(constrain(novo, 0, SUSPENSAO_MAX_DIAS));
+      }
+      if (clique == Clique::Longo) {
+        telaAtual = Tela::Menu;
+      } else if (clique == Clique::Curto) {
+        agenda.suspender(diasChuva, d.agora);
+        agendaMudou = true;
+        avisar(diasChuva == 0 ? "Pausa cancelada" : "Regas em pausa", agoraMs);
+        telaAtual = Tela::Estado;
       }
       break;
 
@@ -266,22 +332,24 @@ void interfaceAtualizar(Controlador& c, const DadosTela& d, uint32_t agoraMs) {
   }
 
   // Sem mexer por 20 s, volta para a tela de estado.
-  if ((telaAtual == Tela::Menu || telaAtual == Tela::Duracao) && agoraMs - ultimaAcaoMs > 20000) {
+  if ((telaAtual == Tela::Menu || telaAtual == Tela::Duracao || telaAtual == Tela::Chuva) && agoraMs - ultimaAcaoMs > 20000) {
     telaAtual = Tela::Estado;
     redesenhar = true;
   }
 
-  if (!redesenhar && agoraMs - ultimoDesenhoMs < 500) return;
+  if (!redesenhar && agoraMs - ultimoDesenhoMs < 500) return agendaMudou;
   redesenhar = false;
   ultimoDesenhoMs = agoraMs;
   tela.clearBuffer();
   switch (telaAtual) {
     case Tela::Boot: desenharBoot(); break;
-    case Tela::Estado: desenharEstado(c, d, agoraMs); break;
+    case Tela::Estado: desenharEstado(c, agenda, d, agoraMs); break;
     case Tela::Menu: desenharMenu(); break;
     case Tela::Duracao: desenharDuracao(); break;
+    case Tela::Chuva: desenharChuva(); break;
   }
   tela.sendBuffer();
+  return agendaMudou;
 }
 
 }  // namespace sabia

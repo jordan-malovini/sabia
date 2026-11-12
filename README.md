@@ -48,6 +48,7 @@ Projeto e esquema fechados, com os esboços da interface web prontos. Aguardando
 | [docs/caixa.md](docs/caixa.md) | Caixa impressa em 3D: leiaute, medidas, impressão e montagem |
 | [docs/mapa-de-pinos.md](docs/mapa-de-pinos.md) | GPIOs do ESP32-S3 e endereços I2C |
 | [docs/api.md](docs/api.md) | Comunicação entre a página web e o firmware |
+| [docs/decisoes/](docs/decisoes/) | Por que cada escolha foi feita (agenda por programas, por exemplo) |
 | [CHANGELOG.md](CHANGELOG.md) | Histórico de versões |
 
 ## Como compilar e gravar
@@ -72,6 +73,8 @@ O BME280 e o VEML7700 não existem no Wokwi e ficam para a bancada.
 **Na tela:** clique abre o menu, gire para escolher o setor, clique, gire para escolher o tempo e clique para ligar. O clique longo volta, e na tela inicial ele para tudo.
 
 **No monitor serial:** `l` pergunta o setor e depois o tempo; `l N S` liga o setor N por S segundos de uma vez; `c S` faz o ciclo; `p` pula; `x N` para o setor N; `s` para tudo; `?` mostra o estado.
+
+**Agenda (programas A, B e C):** `a` mostra a agenda. Exemplos: `g A on`, `g A h 1 06:00` (horário 1 de 4), `g A d 0101010` (dias, de domingo a sábado; ou `impar`, `par`, `int 3`), `g A t 3 25` (setor 3 por 25 min; `*` vale para todos), `g A % 80` (ajuste), `g A run` (inicia agora), `chuva 3` (não rega por 3 dias) e `hora 2026-11-12 19:55` (acerta o relógio). O programa A já vem preenchido (06:00, todos os dias, 25 min por setor), mas desligado.
 
 **Página web:** abra `firmware/data/index.html` no navegador para ver em modo demonstração (dados simulados, qualquer senha). Testes: `node tests/pagina/teste-pagina.mjs` (precisa do Node 22 e do Google Chrome).
 
