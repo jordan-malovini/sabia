@@ -61,9 +61,17 @@ O firmware usa o **PlatformIO** (extensão do VS Code). Abra a pasta `firmware/`
 | Rodar os testes no computador | `pio test -e native` |
 | Abrir o monitor serial | `pio device monitor` |
 
-**Simulação no Wokwi:** instale a extensão Wokwi no VS Code, compile com `pio run -e esp32s3` e rode **Wokwi: Start Simulator**. Os LEDs fazem o papel dos relés e acendem quando o pino vai a LOW, como a placa ativa em nível baixo. Os setores ficam em verde e a bomba em vermelho.
+**Simulação no Wokwi:** instale a extensão Wokwi no VS Code, compile com `pio run -e esp32s3` e rode **Wokwi: Start Simulator** (`Ctrl+Shift+P`). O circuito tem:
+- 9 LEDs no lugar dos relés (setores em verde, bomba em vermelho), que acendem com o pino em LOW;
+- a tela, que no simulador é um OLED SSD1306, porque o Wokwi não tem o ST7920. O firmware troca o driver sozinho;
+- o encoder: clique nele e use as setas para girar e a barra de espaço para clicar;
+- o relógio (DS1307 no lugar do DS3231) e um botão azul que faz o papel do pluviômetro: cada clique vale 0,2 mm de chuva.
 
-**Comandos no monitor serial (v0.1):** `l N S` liga o setor N por S segundos, `c S` faz o ciclo com S segundos por setor, `p` pula, `x N` para o setor N, `s` para tudo e `?` mostra o estado.
+O BME280 e o VEML7700 não existem no Wokwi e ficam para a bancada.
+
+**Na tela:** clique abre o menu, gire para escolher o setor, clique, gire para escolher o tempo e clique para ligar. O clique longo volta, e na tela inicial ele para tudo.
+
+**No monitor serial:** `l` pergunta o setor e depois o tempo; `l N S` liga o setor N por S segundos de uma vez; `c S` faz o ciclo; `p` pula; `x N` para o setor N; `s` para tudo; `?` mostra o estado.
 
 **Página web:** abra `firmware/data/index.html` no navegador para ver em modo demonstração (dados simulados, qualquer senha). Testes: `node tests/pagina/teste-pagina.mjs` (precisa do Node 22 e do Google Chrome).
 

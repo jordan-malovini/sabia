@@ -18,6 +18,9 @@ Formato: uma seção por versão, da mais nova para a mais antiga.
 - Logo do SABIÁ em `assets/logo/` (horizontal, com galho, só o pássaro e ícone), aplicada no README, como favicon e no topo da página web, e em 1 bit para a tela de boot do display (`firmware/include/logo_boot.h`).
 - Caixa do controlador em OpenSCAD (`hardware/caixa-3d/caixa.scad`): base com divisórias, suportes, berços, prensa-cabos e abas de parede; tampa com dobradiça, tela atrás de visor de acrílico e encoder. STL gerados no GitHub Actions. Documentação em `docs/caixa.md`.
 - Caixa: microSD em pé numa paredinha com 2 parafusos (cartão para a tampa, pinos para o ESP) e RTC deitado sobre 3 suportes, no lugar dos berços.
+- Interface local: tela de 128x64 com a logo no boot, tela de estado e menu pelo encoder (escolher o setor, depois o tempo). Relógio e contagem de chuva do pluviômetro na tela.
+- Simulação no Wokwi com tela, encoder, relógio e botão de pluviômetro.
+- Monitor serial com eco do que é digitado e o comando `l` em duas etapas.
 - Nome do projeto: SABIÁ (Sistema Automático de Balanço e Irrigação Agrícola).
 - Documentação dividida em README e `docs/` (requisitos, arquitetura, hardware e mapa de pinos).
 - Requisitos de segurança RF14 (saídas desligadas no boot), RF15 (watchdog) e RF16 (senha e autenticação na página web).
