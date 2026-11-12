@@ -99,6 +99,39 @@
         "color": "red",
         "label": "Bomba"
       }
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled",
+      "top": 170,
+      "left": 230,
+      "attrs": {
+        "i2cAddress": "0x3c"
+      }
+    },
+    {
+      "type": "wokwi-ky-040",
+      "id": "enc",
+      "top": 160,
+      "left": 400,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ds1307",
+      "id": "rtc",
+      "top": 300,
+      "left": 240,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "chuva",
+      "top": 320,
+      "left": 430,
+      "attrs": {
+        "color": "blue",
+        "label": "Pluviômetro (1 clique = 0,2 mm)"
+      }
     }
   ],
   "connections": [
@@ -220,6 +253,96 @@
       "led9:C",
       "esp:47",
       "green",
+      []
+    ],
+    [
+      "oled:VCC",
+      "esp:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "oled:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "oled:SDA",
+      "esp:8",
+      "blue",
+      []
+    ],
+    [
+      "oled:SCL",
+      "esp:9",
+      "orange",
+      []
+    ],
+    [
+      "rtc:5V",
+      "esp:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "rtc:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "rtc:SDA",
+      "esp:8",
+      "blue",
+      []
+    ],
+    [
+      "rtc:SCL",
+      "esp:9",
+      "orange",
+      []
+    ],
+    [
+      "enc:VCC",
+      "esp:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "enc:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "enc:CLK",
+      "esp:1",
+      "purple",
+      []
+    ],
+    [
+      "enc:DT",
+      "esp:2",
+      "purple",
+      []
+    ],
+    [
+      "enc:SW",
+      "esp:21",
+      "gray",
+      []
+    ],
+    [
+      "chuva:1.l",
+      "esp:14",
+      "cyan",
+      []
+    ],
+    [
+      "chuva:2.l",
+      "esp:GND.1",
+      "black",
       []
     ]
   ],
