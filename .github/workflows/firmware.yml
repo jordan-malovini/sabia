@@ -67,6 +67,16 @@ jobs:
           b = open(".pio/build/esp32s3/firmware.bin", "rb").read()
           assert a[0x10000:0x10000 + len(b)] == b, "programa fora do lugar na imagem"
           assert a[0x8000:0x8002] == b"\xaa\x50", "tabela de particoes ausente"
+          # Toda partição tem de caber nos 4 MB de flash do Wokwi.
+          import struct
+          for i in range(0x8000, 0x9000, 32):
+              if a[i:i + 2] != b"\xaa\x50":
+                  break
+              inicio, tamanho = struct.unpack("<II", a[i + 4:i + 12])
+              rotulo = a[i + 12:i + 28].rstrip(b"\0").decode()
+              assert inicio + tamanho <= 0x400000, "particao %s passa de 4 MB" % rotulo
+              print("particao", rotulo, hex(inicio), hex(tamanho))
+          assert len(b) <= 0x300000, "programa maior que a particao de 3 MB"
           print("imagem ok:", len(a), "bytes")
           PY
       - name: Guardar o firmware

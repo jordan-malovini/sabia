@@ -7,7 +7,8 @@
 # Por quê: com só o firmware.bin, o Wokwi usa uma tabela de partições
 # própria, com 1,25 MB para o programa. O SABIÁ passou desse tamanho, e o ESP
 # simulado reiniciava sem parar logo no boot. Com a imagem completa, vale a
-# tabela de partições do projeto.
+# tabela de partições do projeto. No simulador ela é a "huge_app", de 4 MB,
+# que é o tamanho da flash do ESP32-S3 do Wokwi (ver platformio.ini).
 
 Import("env")  # noqa: F821 (fornecido pelo PlatformIO)
 
