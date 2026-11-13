@@ -30,13 +30,13 @@ Enquanto o firmware não responder a `/api/estado`, a página entra em **modo de
     "rtc": true, "ligadoHa": 273600
   },
   "sessao": { "logado": false },
-  "modo": "individual",
   "atual": {
     "setor": 4, "fase": "regando", "restanteS": 720, "duracaoS": 2400,
-    "bomba": true, "origem": "ciclo"
+    "bomba": true, "origem": "programa A"
   },
-  "fila": [ { "setor": 5, "duracaoS": 1800 } ],
-  "proximaRega": { "setor": 5, "hora": "20:00" },
+  "fila": [ { "setor": 6, "duracaoS": 2400 } ],
+  "proximaRega": { "programa": "B", "hora": "20:00", "quando": "hoje" },
+  "pausaChuvaDias": 0,
   "clima": {
     "chuvaHojeMm": 4.2, "chuvaMesMm": 86, "tempC": 27.5,
     "tempMaxC": 31.2, "tempMinC": 21.4, "et0HojeMm": 4.6
@@ -48,8 +48,10 @@ Enquanto o firmware não responder a `/api/estado`, a página entra em **modo de
 ```
 
 - `atual` é `null` quando nada está regando.
-- `fase` segue o `Controlador`: `abrindo`, `regando`, `fechando` ou `pausa`.
-- `origem` pode ser `agenda`, `ciclo` ou `manual`.
+- `fase` segue o `Controlador`: `abrindo`, `regando`, `trocando`, `fechando` ou `pausa`. Em `trocando`, a válvula do próximo setor já abriu e a bomba continua ligada.
+- `origem` pode ser `programa A`, `programa B`, `programa C`, `ciclo`, `manual` ou `retomada`.
+- `proximaRega` é o próximo início da agenda (`null` se nenhum programa estiver ligado). `quando` vem pronto para mostrar: `hoje`, `amanhã` ou o dia da semana.
+- `pausaChuvaDias` é quantos dias faltam na pausa por chuva (0 = sem pausa).
 - `setores` tem sempre 8 itens. `saldoPct` é a água no solo em relação a `estacao.capacidadeSoloMm`.
 
 ## Comandos
@@ -62,9 +64,11 @@ Enquanto o firmware não responder a `/api/estado`, a página entra em **modo de
 | `parar` | `setor` | Encerra o setor, se for o atual, ou o tira da fila. |
 | `pular` | | Encerra o setor atual e segue a fila. |
 | `pararTudo` | | Esvazia a fila e encerra o setor atual. |
-| `ciclo` | | Põe todos os setores ativos na fila, cada um com a duração padrão. |
+| `programa` | `programa` (0 = A, 1 = B, 2 = C) | Põe na fila os setores do programa, com os tempos e o ajuste dele, mesmo que o programa esteja desligado ou hoje não seja dia de rega. |
+| `ciclo` | | Ciclo de teste: põe todos os setores ativos na fila, cada um com a duração padrão. |
+| `chuva` | `dias` (0 a 14) | Pausa a agenda por esse número de dias. 0 cancela a pausa. Não afeta o que for ligado na mão. |
 | `acertarHora` | `hora` (ISO 8601) | Acerta o RTC pela hora do aparelho. |
-| `reiniciar` | | Reinicia o ESP. Nenhuma rega é retomada (RF13). |
+| `reiniciar` | | Reinicia o ESP. A rega em andamento volta depois da espera, se a retomada estiver ligada (RF13). |
 
 Resposta: `200 {"ok": true}`, ou `400` com o motivo em texto (por exemplo, "Esse setor já está na fila"). A página mostra esse texto.
 
@@ -74,14 +78,23 @@ Resposta: `200 {"ok": true}`, ou `400` com o motivo em texto (por exemplo, "Esse
 
 ```json
 {
-  "modo": "individual",
   "balancoHidrico": true, "adiarPorChuva": true, "chuvaAdiarMm": 5,
-  "ciclo": { "inicio": "05:30", "dias": [1,1,1,1,1,1,1] },
-  "bomba": { "usar": true, "atrasoLigarS": 2, "atrasoFecharS": 1, "pausaEntreSetoresS": 3 },
+  "programas": [
+    {
+      "ativo": true,
+      "inicios": ["05:00", null, null, null],
+      "modo": "semana", "dias": [1,1,1,1,1,1,1],
+      "intervaloDias": 2, "inicioIntervalo": "2026-11-13",
+      "minutos": [0, 40, 0, 40, 0, 40, 0, 40],
+      "ajustePct": 100
+    }
+  ],
+  "retomada": { "ativa": true, "esperaMin": 10, "limiteMin": 120 },
+  "bomba": { "usar": true, "atrasoLigarS": 2, "atrasoFecharS": 1, "sobreposicaoS": 2, "pausaEntreSetoresS": 3 },
   "setores": [
     {
       "nome": "Setor 1", "ativo": true, "tipo": "gotejo",
-      "duracaoMin": 35, "horarios": ["20:00"], "dias": [1,1,1,1,1,1,1],
+      "duracaoMin": 35,
       "kc": 1.0, "taxaMmH": 2.5, "eficienciaPct": 90,
       "deficitMinMm": 3, "tempoMaxMin": 60,
       "janela": ["00:00", "23:59"], "fator": 1.0
@@ -97,10 +110,17 @@ Resposta: `200 {"ok": true}`, ou `400` com o motivo em texto (por exemplo, "Esse
 ```
 
 Regras:
+- `programas` tem sempre 3 itens (A, B, C), no modelo da classe `Agenda` do firmware:
+  - `inicios`: 4 posições, `"HH:MM"` ou `null`.
+  - `modo`: `semana` (usa `dias`), `impares`, `pares` (dia do mês) ou `intervalo` (a cada `intervaloDias`, de 1 a 31, contando de `inicioIntervalo`).
+  - `minutos`: 8 posições, de 0 a 180. 0 deixa o setor fora do programa.
+  - `ajustePct`: de 5 a 200. O tempo de cada setor é `minutos × ajustePct / 100`, calculado em segundos e cortado no `tempoMaxMin` do setor.
 - `dias` começa no domingo (índice 0).
+- `duracaoMin` do setor é a duração padrão para ligar na mão e para o ciclo de teste. Os tempos da agenda ficam nos programas.
+- `retomada`: ver `docs/decisoes/2026-11-13-retomada-apos-queda-de-energia.md`.
 - **Senhas nunca saem do ESP.** No `GET`, `rede.wifiSenha` e `rede.apSenha` voltam vazias. No `PUT`, uma senha vazia significa "manter a atual".
 - Para trocar a senha da página, o `PUT` traz `seguranca.novaSenha`. Esse campo não é guardado como texto e não volta no `GET`.
-- O firmware valida tudo de novo (faixas, `duracaoMin` ≤ `tempoMaxMin`, senha do AP com 8 caracteres ou mais) e responde `400` com o motivo se algo estiver errado. A validação da página serve só para ajudar quem está digitando.
+- O firmware valida tudo de novo (faixas, `duracaoMin` e os `minutos` dos programas ≤ `tempoMaxMin`, senha do AP com 8 caracteres ou mais) e responde `400` com o motivo se algo estiver errado. A validação da página serve só para ajudar quem está digitando.
 
 ## Histórico
 
@@ -114,7 +134,7 @@ Regras:
   "tempMinC": [21.0, 20.2, 21.4],
   "et0Mm": [4.1, 3.0, 3.8],
   "regas": [ { "setor": 1, "nome": "Setor 1", "vezes": 6, "minutos": 210 } ],
-  "eventos": [ ["sáb 14:20", "Setor 4 iniciou (ciclo, 40 min)"] ]
+  "eventos": [ ["sáb 14:20", "Setor 4 iniciou (programa A, 40 min)"] ]
 }
 ```
 

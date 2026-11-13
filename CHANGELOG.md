@@ -26,6 +26,7 @@ Formato: uma seção por versão, da mais nova para a mais antiga.
 - 14 testes da agenda, incluindo o defeito do controlador antigo (regar todos os dias no mesmo horário).
 - Retomada depois de queda de energia: o setor atual, o tempo que falta e a fila são gravados; ao voltar, espera 10 min e retoma, com opção de retomar na hora ou cancelar, e descarta se a energia ficou fora por mais de 2 h.
 - Edição da agenda pelo encoder ("Programar agenda"): ligar o programa, horários de início, dias (semana, ímpares, pares, intervalo), tempo de cada setor e ajuste.
+- Página web no modelo de programas: agenda A, B e C nos Ajustes (horários, dias, tempo por setor, ajuste), pausa por chuva, "Iniciar programa" no painel, próxima rega por programa e ajustes de retomada e de sobreposição. `docs/api.md` atualizado; a página passa a ter 54 testes.
 - Nome do projeto: SABIÁ (Sistema Automático de Balanço e Irrigação Agrícola).
 - Documentação dividida em README e `docs/` (requisitos, arquitetura, hardware e mapa de pinos).
 - Requisitos de segurança RF14 (saídas desligadas no boot), RF15 (watchdog) e RF16 (senha e autenticação na página web).
