@@ -335,7 +335,7 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const DIAS = ["D", "S", "T", "Q", "Q", "S", "S"];
 const DIAS_NOME = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const LIMITE_DESATUALIZADO_S = 30;
-const num = (v, casas = 1) => Number(v).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+const num = (v, casas = 1) => v == null ? "–" : Number(v).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
 const minutos = s => Math.max(0, Math.ceil(s / 60));
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -641,7 +641,7 @@ window.addEventListener("resize", () => $("#tituloPagina").classList.toggle("ocu
    --------------------------------------------------------------------- */
 function desenharTopo() {
   const e = estadoApp.estado;
-  const d = e ? new Date(e.hora) : new Date();
+  const d = e && e.hora ? new Date(e.hora) : new Date();
   const dia = d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" }).replace(".", "");
   const idade = Math.round((Date.now() - estadoApp.ultimaAtualizacao) / 1000);
   const velho = !e || idade > LIMITE_DESATUALIZADO_S;
@@ -655,8 +655,10 @@ function desenharTopo() {
   if (!e) { texto = "Conectando…"; chip.classList.add("alerta"); }
   else if (velho) { texto = "Sem resposta"; chip.classList.add("erro"); }
   else if (e.sistema.modoAp) { texto = "Modo AP"; chip.classList.add("alerta"); }
-  else if (!e.sistema.cartaoSd.ok) { texto = "Cartão SD"; chip.classList.add("alerta"); }
+  else if (e.sistema.cartaoSd && !e.sistema.cartaoSd.ok) { texto = "Cartão SD"; chip.classList.add("alerta"); }
   else if (!e.sistema.wifi) { texto = "Sem Wi-Fi"; chip.classList.add("alerta"); }
+  else if (!e.sistema.rtc) { texto = "Sem relógio"; chip.classList.add("erro"); }
+  else if (e.sessao?.senhaPadrao) { texto = "Troque a senha"; chip.classList.add("alerta"); }
   $("#textoStatus").textContent = texto;
 
   $("#chipSessao").textContent = estadoApp.logado ? "Sair" : "🔒 Entrar";
@@ -669,12 +671,13 @@ function abrirStatus() {
   const linhas = [
     ["Wi-Fi", s.wifi ? `conectado · ${s.ip}` : "desconectado"],
     ["Rede própria (AP)", s.modoAp ? "ativa" : "desligada"],
-    ["Cartão SD", s.cartaoSd.ok ? `ok · ${s.cartaoSd.usoPct}% usado` : "com problema"],
+    ["Cartão SD", !s.cartaoSd ? "registro ainda não disponível" : s.cartaoSd.ok ? `ok · ${s.cartaoSd.usoPct}% usado` : "com problema"],
     ["Google Drive", s.drive.ativo ? `último envio ${s.drive.ultimoEnvio}` : "desativado"],
     ["Relógio (RTC)", s.rtc ? "ok" : "sem resposta"],
     ["Ligado há", `${dias} d ${horas} h`],
     ["Firmware", e.versao],
   ];
+  if (e.sessao?.senhaPadrao) linhas.push(["Senha da página", "ainda é a de fábrica: troque em Ajustes"]);
   $("#listaStatus").innerHTML = linhas.map(([a, b]) => `<div><span class="suave">${a}</span><span>${esc(b)}</span></div>`).join("");
   $("#dlgStatus").showModal();
 }
@@ -696,7 +699,18 @@ function desenharDestaque() {
   const bloq = estadoApp.logado ? "" : " bloqueado";
   if (!e.atual) {
     el.className = "destaque parado";
-    const p = e.proximaRega;
+    const p = e.proximaRega, r = e.retomada;
+    if (r) {
+      // A energia voltou e há uma rega interrompida esperando para continuar.
+      const mm = Math.floor(r.faltamS / 60), ss = String(r.faltamS % 60).padStart(2, "0");
+      el.innerHTML = `<div class="info"><p class="suave pequeno">A energia voltou</p>
+        <p style="font-size:20px;font-weight:600;margin-top:2px">Retomando ${esc(nomeSetor(r.setor))}${r.setores > 1 ? ` e mais ${r.setores - 1}` : ""} em ${mm}:${ss}</p>
+        <div class="acoes" style="margin-top:10px">
+          <button class="btn${bloq}" data-acao="retomar">Retomar agora</button>
+          <button class="btn contorno${bloq}" data-acao="cancelarRetomada">Cancelar</button>
+        </div></div>`;
+      return;
+    }
     el.innerHTML = `<div class="info"><p class="suave pequeno">Nada regando</p>
       <p style="font-size:20px;font-weight:600;margin-top:2px">${p ? `Próxima: programa ${esc(p.programa)}, ${esc(p.quando)} às ${esc(p.hora)}` : "Nenhuma rega agendada"}</p>
       ${e.pausaChuvaDias ? `<p class="suave pequeno" style="margin-top:4px">Regas em pausa por chuva: ${e.pausaChuvaDias} ${e.pausaChuvaDias === 1 ? "dia" : "dias"}</p>` : ""}</div>`;
@@ -751,7 +765,13 @@ function desenharSetores() {
   const limite = pequeno && !estadoApp.mostrarTodos ? 4 : 8;
   let html = "";
   cfg.setores.slice(0, limite).forEach((s, i) => {
-    const n = i + 1, info = e.setores[i];
+    const n = i + 1, info = e.setores[i] || {};
+    if (info.proxima === undefined) {
+      // O controlador não manda a próxima rega de cada setor: a conta sai da agenda.
+      const agora = e.hora ? new Date(e.hora) : new Date();
+      const px = proximoInicio(cfg, agora, i, e.pausaChuvaDias ? meiaNoite(agora, e.pausaChuvaDias) : null);
+      info.proxima = px ? `${rotuloDia(px.dias)} ${px.hora} · prog. ${LETRAS[px.programa]} · ${minutosSetor(cfg.programas[px.programa], i)} min` : null;
+    }
     const regando = e.atual && e.atual.setor === n;
     const naFila = e.fila.some(p => p.setor === n);
     let situacao = info.adiadoAte ? `Rega adiada por chuva até ${esc(info.adiadoAte)}` : info.proxima ? `Próxima: ${esc(info.proxima)}` : "Fora da agenda";
@@ -766,8 +786,8 @@ function desenharSetores() {
       <div class="corpo">
         <button class="nome" data-config-setor="${n}">${esc(s.nome)} · ${s.tipo === "aspersao" ? "Aspersão" : "Gotejo"}</button>
         <p class="situacao">${situacao}</p>
-        <div class="barra"><div style="width:${info.saldoPct}%;background:${corSaldo(info.saldoPct)}"></div></div>
-        <p class="suave" style="font-size:11px;margin-top:4px">Água no solo ${info.saldoPct}%</p>
+        ${info.saldoPct == null ? "" : `<div class="barra"><div style="width:${info.saldoPct}%;background:${corSaldo(info.saldoPct)}"></div></div>
+        <p class="suave" style="font-size:11px;margin-top:4px">Água no solo ${info.saldoPct}%</p>`}
       </div>${botao}</div>`;
   });
   if (limite < 8) html += `<button class="btn contorno" id="verTodos" style="background:transparent">Ver os outros 4 setores</button>`;
@@ -856,6 +876,14 @@ async function desenharHistorico() {
   $$("#periodos button").forEach(b => b.classList.toggle("ativo", b.dataset.p === p));
   let h;
   try { h = await api.historico(p); } catch { $("#graficos").innerHTML = `<p class="aviso erro">Não foi possível carregar o histórico.</p>`; return; }
+  if (!h.rotulos.length) {
+    // O controlador ainda não grava o histórico (falta o registro no cartão SD).
+    $("#graficos").innerHTML = `<p class="aviso">Ainda não há histórico. Ele começa a ser gravado quando o registro no cartão SD estiver pronto.</p>`;
+    $("#tabelaRegas").innerHTML = ""; $("#eventos").innerHTML = "";
+    $$("[data-csv]").forEach(b => { b.disabled = true; });
+    return;
+  }
+  $$("[data-csv]").forEach(b => { b.disabled = false; });
   const total = h.chuvaMm.reduce((a, b) => a + b, 0);
   const cartao = (titulo, svg, legenda = "") => `<div class="cartao grafico"><h3>${titulo}</h3>${svg}${legenda}</div>`;
   let html = cartao(`Chuva ${p === "hoje" ? "por hora" : "por dia"} · total ${num(total)} mm`,
@@ -1093,7 +1121,7 @@ function ligarAjustes(raiz) {
     if (seg) { definir(estadoApp.rascunho, seg.dataset.seg, b.dataset.valor); preencherAjustes(); marcarSujo(); }
     else if (dias) { const arr = obter(estadoApp.rascunho, dias.dataset.dias); arr[b.dataset.i] = arr[b.dataset.i] ? 0 : 1; preencherAjustes(); marcarSujo(); }
     else if (b.id === "btnPausar") { const dias = Math.max(0, Math.min(14, Number($("#diasPausa").value) || 0)); enviar({ acao: "chuva", dias }, dias ? "Regas em pausa" : "Pausa cancelada").then(preencherSeAjustes); }
-    else if (b.id === "btnAcertarHora") enviar({ acao: "acertarHora", hora: new Date().toISOString() }, "Hora acertada");
+    else if (b.id === "btnAcertarHora") enviar({ acao: "acertarHora", hora: new Date().toLocaleString("sv").replace(" ", "T") }, "Hora acertada");
     else if (b.id === "btnExportar") exportarAjustes();
     else if (b.id === "btnPadrao") confirmar("Restaurar padrão?", "Os ajustes voltam ao padrão de fábrica no formulário. Nada muda até você salvar.", "Restaurar", () => {
       const atual = estadoApp.rascunho; const p = configPadrao(); p.rede = atual.rede; estadoApp.rascunho = p; preencherAjustes(); marcarSujo(); });
@@ -1177,6 +1205,8 @@ document.addEventListener("click", ev => {
   if (b.dataset.ligar) abrirLigar(Number(b.dataset.ligar));
   else if (b.dataset.parar) { const n = Number(b.dataset.parar); const reg = estadoApp.estado.atual?.setor === n; if (exigirLogin()) enviar({ acao: "parar", setor: n }, reg ? `${nomeSetor(n)} parando` : `${nomeSetor(n)} saiu da fila`); }
   else if (b.dataset.tirar) { const n = Number(b.dataset.tirar); if (exigirLogin()) enviar({ acao: "parar", setor: n }, `${nomeSetor(n)} saiu da fila`); }
+  else if (b.dataset.acao === "retomar") { if (exigirLogin()) enviar({ acao: "retomar" }, "Retomando a rega"); }
+  else if (b.dataset.acao === "cancelarRetomada") { if (exigirLogin()) enviar({ acao: "cancelarRetomada" }, "Retomada cancelada"); }
   else if (b.dataset.acao === "pular") { if (exigirLogin()) enviar({ acao: "pular" }, "Pulando setor"); }
   else if (b.dataset.acao === "pararTudo") { if (exigirLogin()) confirmar("Parar tudo?", "O setor atual fecha e a fila é esvaziada. A agenda continua valendo para as próximas regas.", "Parar tudo", () => enviar({ acao: "pararTudo" }, "Parando tudo")); }
   else if (b.dataset.configSetor) { location.hash = "ajustes"; setTimeout(() => { const g = $$("details.grupo")[1]; g.open = true; const d = $(`[data-setor-det="${b.dataset.configSetor}"]`); d.open = true; d.scrollIntoView({ block: "start" }); }, 50); }

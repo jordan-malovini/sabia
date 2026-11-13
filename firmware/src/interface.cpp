@@ -117,6 +117,7 @@ static const char* textoResultado(Resultado r) {
     case Resultado::Aceito: return "Na fila";
     case Resultado::JaNaFila: return "Ja esta na fila";
     case Resultado::FilaCheia: return "Fila cheia";
+    case Resultado::SetorDesativado: return "Setor desativado";
     default: return "Invalido";
   }
 }

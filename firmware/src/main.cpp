@@ -22,6 +22,10 @@
 // Queda de energia:
 //   retomar | cancelar   durante a espera depois que a energia volta
 //   reiniciar            reinicia o ESP (para testar a retomada)
+// Rede e página web:
+//   wifi                 mostra a rede e o endereço da página
+//   wifi NOME SENHA      troca o Wi-Fi da casa (nome sem espaços)
+//   senha padrao         volta a senha da página para a de fábrica
 
 #include <Arduino.h>
 #include <Preferences.h>
@@ -35,10 +39,9 @@
 #include "Retomada.h"
 #include "interface.h"
 #include "pinos.h"
+#include "sistema.h"
 
 using namespace sabia;
-
-constexpr float MM_POR_BASCULADA = 0.2f;
 
 class SaidasReles : public Saidas {
  public:
@@ -46,7 +49,8 @@ class SaidasReles : public Saidas {
     if (setor < 1 || setor > NUM_SETORES) return;
     escrever(PINOS_SETORES[setor - 1], aberta);
   }
-  void bomba(bool ligada) override { escrever(PINO_BOMBA, ligada); }
+  // Com "usar bomba" desligado nos ajustes, o relé da bomba nunca liga.
+  void bomba(bool ligada) override { escrever(PINO_BOMBA, ligada && ajustes.usarBomba); }
 
  private:
   static void escrever(uint8_t pino, bool ligado) {
@@ -55,21 +59,19 @@ class SaidasReles : public Saidas {
 };
 
 static SaidasReles saidas;
-static Controlador controlador(saidas);
-static Agenda agenda(controlador);
-static Preferences memoria;
+Ajustes sabia::ajustes;
+Controlador sabia::controlador(saidas);
+Agenda sabia::agenda(sabia::controlador);
+Retomada sabia::retomada;
+Preferences sabia::memoria;
 
-static ConfigRetomada configRetomada() {
-  ConfigRetomada c;
-#ifdef SABIA_SIMULADOR
-  c.esperaS = 30;   // no simulador, meio minuto basta para ver a contagem
-#else
-  c.esperaS = 600;  // 10 minutos para a rede estabilizar
-#endif
-  c.limiteMin = 120;
-  return c;
-}
-static Retomada retomada(configRetomada());
+// Trava entre o loop e a tarefa do servidor web (ver sistema.h).
+static SemaphoreHandle_t trava = nullptr;
+void sabia::travar() { if (trava != nullptr) xSemaphoreTake(trava, portMAX_DELAY); }
+void sabia::destravar() { if (trava != nullptr) xSemaphoreGive(trava); }
+
+static uint32_t reiniciarEmMs = 0;
+void sabia::pedirReinicio() { reiniciarEmMs = millis() + 800; if (reiniciarEmMs == 0) reiniciarEmMs = 1; }
 static PontoSalvo ultimoPonto;     // o que está gravado na memória
 static uint32_t ultimoPontoMs = 0;
 
@@ -100,7 +102,7 @@ static void configurarSaidaSegura(uint8_t pino) {
   pinMode(pino, OUTPUT);
 }
 
-static DadosTela lerDados() {
+DadosTela sabia::lerDados() {
   // O relógio é lido no máximo 4 vezes por segundo, para não ocupar o I2C.
   static DadosTela d;
   static uint32_t ultimaLeituraMs = 0;
@@ -111,6 +113,7 @@ static DadosTela lerDados() {
     d.temHora = true;
     d.hora = agora.hour();
     d.minuto = agora.minute();
+    d.segundo = agora.second();
     d.dia = agora.day();
     d.mes = agora.month();
     d.agora.ano = agora.year();
@@ -123,8 +126,16 @@ static DadosTela lerDados() {
       pulsosInicioDoDia = pulsosChuva;
     }
   }
-  d.chuvaMm = (pulsosChuva - pulsosInicioDoDia) * MM_POR_BASCULADA;
+  d.chuvaMm = (pulsosChuva - pulsosInicioDoDia) * ajustes.mmPorBasculada;
   return d;
+}
+
+bool sabia::temRelogio() { return temRtc; }
+
+bool sabia::acertarRelogio(uint16_t ano, uint8_t mes, uint8_t dia, uint8_t hora, uint8_t minuto, uint8_t segundo) {
+  if (!temRtc || ano < 2024 || ano > 2099 || mes < 1 || mes > 12 || dia < 1 || dia > 31 || hora > 23 || minuto > 59 || segundo > 59) return false;
+  rtc.adjust(DateTime(ano, mes, dia, hora, minuto, segundo));
+  return true;
 }
 
 static void mostrarEstado() {
@@ -150,7 +161,7 @@ static void mostrarEstado() {
 // ---------------------------------------------------------------------------
 constexpr uint8_t VERSAO_AGENDA = 1;
 
-static void salvarAgenda() {
+void sabia::salvarAgenda() {
   memoria.putUChar("ver", VERSAO_AGENDA);
   memoria.putBytes("prog", agenda.programas(), sizeof(Programa) * NUM_PROGRAMAS);
   memoria.putULong("susp", agenda.suspensoAteDia());
@@ -310,6 +321,7 @@ static const char* textoResultado(Resultado r) {
     case Resultado::DuracaoInvalida: return "duracao invalida";
     case Resultado::JaNaFila: return "setor ja esta regando ou na fila";
     case Resultado::FilaCheia: return "fila cheia";
+    case Resultado::SetorDesativado: return "setor desativado nos ajustes";
   }
   return "?";
 }
@@ -317,7 +329,8 @@ static const char* textoResultado(Resultado r) {
 static void ajuda() {
   Serial.print("Comandos: l | l N S | c S | p | x N | s | ?\r\n"
                "Agenda:   a | g A on/off/h/d/t/%/run | chuva N | hora AAAA-MM-DD HH:MM\r\n"
-               "Energia:  retomar | cancelar | reiniciar\r\n> ");
+               "Energia:  retomar | cancelar | reiniciar\r\n"
+               "Rede:     wifi | wifi NOME SENHA | senha padrao\r\n> ");
 }
 
 // Ligar em duas etapas pelo serial: primeiro o setor, depois o tempo.
@@ -360,6 +373,36 @@ static void tratarComando(const String& linha) {
     Serial.print("Reiniciando...\r\n");
     Serial.flush();
     ESP.restart();
+  }
+  if (linha == "wifi") {
+    webMostrarRede(Serial);
+    Serial.print("> ");
+    return;
+  }
+  if (linha.startsWith("wifi ")) {
+    String resto = linha.substring(5);
+    resto.trim();
+    int espaco = resto.indexOf(' ');
+    String nome = espaco < 0 ? resto : resto.substring(0, espaco);
+    String senha = espaco < 0 ? String() : resto.substring(espaco + 1);
+    senha.trim();
+    if (nome.length() == 0 || nome.length() > 32 || senha.length() > 63) {
+      Serial.print("Uso: wifi NOME SENHA\r\n> ");
+      return;
+    }
+    JsonDocument doc;
+    configCarregar(doc);
+    doc["rede"]["wifiNome"] = nome;
+    configGravar(doc);
+    memoria.putString("wifiSenha", senha);
+    webReconfigurarRede();
+    Serial.printf("Wi-Fi trocado para \"%s\". Conectando...\r\n> ", nome.c_str());
+    return;
+  }
+  if (linha == "senha padrao") {
+    webRestaurarSenhaPadrao();
+    Serial.print("Senha da pagina voltou para a de fabrica\r\n> ");
+    return;
   }
   if (linha.startsWith("chuva")) {
     int dias = linha.substring(5).toInt();
@@ -431,7 +474,13 @@ void setup() {
   pinMode(PINO_PLUVIOMETRO, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PINO_PLUVIOMETRO), isrPluviometro, FALLING);
 
+  trava = xSemaphoreCreateMutex();
   memoria.begin("sabia", false);
+  {
+    JsonDocument doc;
+    configCarregar(doc);
+    configAplicar(doc.as<JsonVariantConst>());
+  }
   carregarAgenda();
 
   interfaceIniciar();
@@ -440,10 +489,17 @@ void setup() {
   Serial.print("\r\nSABIA v" SABIA_VERSAO "\r\n");
   if (!temRtc) Serial.print("Aviso: relogio (RTC) nao encontrado\r\n");
   carregarPonto();
+  webIniciar();
   ajuda();
 }
 
 void loop() {
+  if (reiniciarEmMs != 0 && static_cast<int32_t>(millis() - reiniciarEmMs) >= 0) {
+    Serial.print("\r\nReiniciando...\r\n");
+    Serial.flush();
+    ESP.restart();
+  }
+  travar();
   static String linha;
   while (Serial.available()) {
     char c = static_cast<char>(Serial.read());
@@ -458,7 +514,7 @@ void loop() {
         linha.remove(linha.length() - 1);
         Serial.print("\b \b");
       }
-    } else if (c >= 32 && linha.length() < 40) {
+    } else if (c >= 32 && linha.length() < 110) {
       linha += c;
       Serial.print(c);  // eco: mostra o que foi digitado
     }
@@ -480,4 +536,6 @@ void loop() {
   if (dados.temHora) agenda.tick(dados.agora);  // sem relógio, a agenda não roda
   if (interfaceAtualizar(controlador, agenda, retomada, dados, agora)) salvarAgenda();
   salvarPontoSePreciso();
+  destravar();
+  delay(2);  // dá a vez à tarefa do servidor web
 }

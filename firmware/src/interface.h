@@ -17,7 +17,7 @@ namespace sabia {
 
 struct DadosTela {
   bool temHora = false;
-  uint8_t hora = 0, minuto = 0, dia = 0, mes = 0;
+  uint8_t hora = 0, minuto = 0, segundo = 0, dia = 0, mes = 0;
   float chuvaMm = 0;
   Momento agora;  // data e hora completas, para a agenda
 };

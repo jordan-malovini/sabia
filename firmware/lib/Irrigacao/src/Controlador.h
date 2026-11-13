@@ -35,6 +35,8 @@ struct Config {
   uint32_t sobreposicaoMs = 2000;         // troca: as duas válvulas abertas, bomba ligada
   uint32_t pausaEntreSetoresMs = 3000;    // depois de a bomba desligar, antes de religar
   uint32_t tempoMaximoS = 60UL * 60UL;    // limite de uma rega (RF13)
+  uint32_t tempoMaximoSetorS[NUM_SETORES] = {};  // limite por setor; 0 = usa o geral
+  bool setorDesativado[NUM_SETORES] = {};        // setor que não pode regar
 };
 
 enum class Estado : uint8_t {
@@ -52,6 +54,7 @@ enum class Resultado : uint8_t {
   DuracaoInvalida,
   JaNaFila,   // o setor já está regando ou esperando
   FilaCheia,
+  SetorDesativado,
 };
 
 struct Pedido {
@@ -66,7 +69,12 @@ class Controlador {
   // Desliga todas as saídas e zera o estado. Chamar no boot.
   void iniciar();
 
-  // Pede a rega de um setor. Durações acima do máximo são cortadas no máximo.
+  // Troca os ajustes. Vale para os próximos pedidos e as próximas fases;
+  // o que já está na fila mantém a duração com que entrou.
+  void definirConfig(const Config& config) { config_ = config; }
+  const Config& config() const { return config_; }
+
+  // Pede a rega de um setor. Durações acima do máximo (do setor ou geral) são cortadas no máximo.
   Resultado pedir(uint8_t setor, uint32_t duracaoS);
 
   // Modo ciclo: enfileira, em ordem, os setores com duração maior que zero.
@@ -82,6 +90,7 @@ class Controlador {
 
   Estado estado() const { return estado_; }
   uint8_t setorAtivo() const { return atual_.setor; }  // 0 se nenhum
+  uint32_t duracaoAtualS() const { return atual_.duracaoS; }
   uint8_t proximoSetor() const { return proximo_.setor; }  // só durante a troca
   Pedido proximoPedido() const { return proximo_; }
   uint32_t restanteS() const;

@@ -51,6 +51,9 @@ class Retomada {
  public:
   explicit Retomada(const ConfigRetomada& config = ConfigRetomada()) : config_(config) {}
 
+  void definirConfig(const ConfigRetomada& config) { config_ = config; }
+  const ConfigRetomada& config() const { return config_; }
+
   // Chamar uma vez ao ligar. minutoAgora = 0 quando não há relógio.
   void iniciar(const PontoSalvo& ponto, uint32_t minutoAgora, uint32_t agoraMs);
 
