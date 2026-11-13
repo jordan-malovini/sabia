@@ -267,8 +267,10 @@ class DecisorFalso : public Decisor {
   bool adiar = false;
   int consultas = 0;
   bool adiarInicio() override { return adiar; }
-  uint32_t duracao(uint8_t setor, uint32_t programadaS) override {
+  uint32_t ultimoDepoisS = 99999;
+  uint32_t duracao(uint8_t setor, uint32_t programadaS, uint32_t depoisS) override {
     consultas++;
+    if (setor == 2) ultimoDepoisS = depoisS;
     return setor == 1 ? programadaS / 2 : 0;
   }
 };
@@ -284,6 +286,19 @@ void test_decisor_ajusta_o_tempo_de_cada_setor() {
   TEST_ASSERT_EQUAL(1, c.tamanhoFila());            // o setor 2 foi pulado
   TEST_ASSERT_EQUAL(1, c.itemFila(0).setor);
   TEST_ASSERT_EQUAL(30, c.itemFila(0).duracaoS);    // metade de 1 min
+  TEST_ASSERT_EQUAL(30, d.ultimoDepoisS);           // o setor 2 começaria depois dos 30 s do setor 1
+}
+
+void test_janela_de_horario() {
+  TEST_ASSERT_TRUE(dentroDaJanela(0, 0, 1439));        // o dia todo
+  TEST_ASSERT_TRUE(dentroDaJanela(1439, 0, 1439));
+  TEST_ASSERT_TRUE(dentroDaJanela(240, 240, 480));     // 04:00 a 08:00, pontas valem
+  TEST_ASSERT_TRUE(dentroDaJanela(480, 240, 480));
+  TEST_ASSERT_FALSE(dentroDaJanela(481, 240, 480));
+  TEST_ASSERT_FALSE(dentroDaJanela(239, 240, 480));
+  TEST_ASSERT_TRUE(dentroDaJanela(1380, 1320, 360));   // 22:00 a 06:00, atravessa a meia-noite
+  TEST_ASSERT_TRUE(dentroDaJanela(100, 1320, 360));
+  TEST_ASSERT_FALSE(dentroDaJanela(720, 1320, 360));
 }
 
 void test_decisor_adia_o_inicio_quando_choveu() {
@@ -337,6 +352,7 @@ int main(int, char**) {
   RUN_TEST(test_proximo_inicio);
   RUN_TEST(test_decisor_ajusta_o_tempo_de_cada_setor);
   RUN_TEST(test_decisor_adia_o_inicio_quando_choveu);
+  RUN_TEST(test_janela_de_horario);
   RUN_TEST(test_decisor_nao_vale_para_inicio_manual);
   return UNITY_END();
 }

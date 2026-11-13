@@ -49,6 +49,7 @@ void configAplicar(JsonVariantConst cfg) {
   controlador.definirConfig(novos.controlador);
   retomada.definirConfig(novos.retomada);
   balancoAplicarAjustes();
+  interfaceOpcoes(novos.luzSegundos, novos.travarComandos);
 }
 
 }  // namespace sabia

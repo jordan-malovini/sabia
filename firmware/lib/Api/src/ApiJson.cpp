@@ -158,6 +158,22 @@ const char* programaDeJson(JsonVariantConst e, Programa& p) {
 // ---------------------------------------------------------------------------
 // Configuração
 // ---------------------------------------------------------------------------
+int16_t fusoParaMinutos(const char* fuso) {
+  struct Par { const char* nome; int16_t minutos; };
+  static const Par FUSOS[] = {
+      {"America/Noronha", -120},     {"America/Sao_Paulo", -180},   {"America/Bahia", -180},
+      {"America/Fortaleza", -180},   {"America/Recife", -180},      {"America/Belem", -180},
+      {"America/Maceio", -180},      {"America/Araguaina", -180},   {"America/Santarem", -180},
+      {"America/Manaus", -240},      {"America/Cuiaba", -240},      {"America/Campo_Grande", -240},
+      {"America/Porto_Velho", -240}, {"America/Boa_Vista", -240},   {"America/Rio_Branco", -300},
+      {"America/Eirunepe", -300},
+  };
+  if (fuso != nullptr) {
+    for (const Par& p : FUSOS) if (strcmp(fuso, p.nome) == 0) return p.minutos;
+  }
+  return -180;
+}
+
 void configPadrao(JsonDocument& doc) {
   doc.clear();
   doc["balancoHidrico"] = false;  // só depois de informar a latitude e medir a taxa de cada setor
@@ -204,7 +220,7 @@ void configPadrao(JsonDocument& doc) {
   estacao["ajusteTempC"] = 0;
 
   JsonObject relogio = doc["relogio"].to<JsonObject>();
-  relogio["ntp"] = false;
+  relogio["ntp"] = true;
   relogio["fuso"] = "America/Sao_Paulo";
 
   JsonObject rede = doc["rede"].to<JsonObject>();
@@ -263,6 +279,10 @@ const char* validarConfig(JsonVariantConst c) {
     if (!decimal(s["eficienciaPct"], 10.0f, 100.0f)) return erroSetor(i + 1, "eficiência fora da faixa (10 a 100 %)");
     if (!decimal(s["deficitMinMm"], 0.0f, 100.0f)) return erroSetor(i + 1, "déficit mínimo fora da faixa (0 a 100 mm)");
     if (!decimal(s["fator"], 0.1f, 3.0f)) return erroSetor(i + 1, "fator de ajuste fora da faixa (0,1 a 3)");
+    uint16_t m = 0;
+    JsonArrayConst janela = s["janela"].as<JsonArrayConst>();
+    if (janela.size() != 2 || !horaDeTexto(janela[0].as<const char*>(), m) || !horaDeTexto(janela[1].as<const char*>(), m))
+      return erroSetor(i + 1, "janela de horário inválida");
   }
 
   JsonArrayConst programas = c["programas"].as<JsonArrayConst>();
@@ -312,6 +332,11 @@ const char* validarConfig(JsonVariantConst c) {
   if (!estacao["latitude"].isNull() && !decimal(estacao["latitude"], -90.0f, 90.0f)) return "Estação: latitude fora da faixa (-90 a 90)";
   if (!decimal(estacao["ajusteTempC"], -10.0f, 10.0f)) return "Estação: correção da temperatura fora da faixa (-10 a 10)";
 
+  if (!c["relogio"]["ntp"].is<bool>()) return "Relógio: falta dizer se acerta pela internet";
+  if (!texto(c["relogio"]["fuso"], 1, 40)) return "Relógio: fuso horário inválido";
+  if (!inteiro(c["display"]["luzSegundos"], 0, 600, n)) return "Display: tempo da luz fora da faixa (0 a 600 s)";
+  if (!c["display"]["travarComandos"].is<bool>()) return "Display: falta dizer se os comandos ficam travados";
+
   JsonVariantConst registro = c["registro"];
   if (!inteiro(registro["diasNoCartao"], 1, 60, n)) return "Registro: dias no cartão fora da faixa (1 a 60)";
   if (!inteiro(registro["envioHoras"], 1, 168, n)) return "Registro: intervalo de envio fora da faixa (1 a 168 h)";
@@ -354,6 +379,13 @@ void lerAjustes(JsonVariantConst c, Ajustes& a) {
     a.setores[i].eficiencia = (s["eficienciaPct"] | 90.0f) / 100.0f;
     a.setores[i].deficitMinMm = s["deficitMinMm"] | 3.0f;
     a.setores[i].fator = s["fator"] | 1.0f;
+    a.janelaInicio[i] = 0;
+    a.janelaFim[i] = 1439;
+    uint16_t inicio = 0, fim = 0;
+    if (horaDeTexto(s["janela"][0] | "", inicio) && horaDeTexto(s["janela"][1] | "", fim)) {
+      a.janelaInicio[i] = inicio;
+      a.janelaFim[i] = fim;
+    }
     if (maxMin * 60UL > maior) maior = maxMin * 60UL;
   }
   a.controlador.tempoMaximoS = maior;
@@ -374,6 +406,11 @@ void lerAjustes(JsonVariantConst c, Ajustes& a) {
   a.latitude = c["estacao"]["latitude"].is<float>() ? c["estacao"]["latitude"].as<float>() : NAN;
   a.solo.capacidadeMm = c["estacao"]["capacidadeSoloMm"] | 40.0f;
   a.solo.chuvaEfetivaMinMm = c["estacao"]["chuvaEfetivaMinMm"] | 2.0f;
+  a.ntp = c["relogio"]["ntp"] | true;
+  a.fusoMin = fusoParaMinutos(c["relogio"]["fuso"] | "America/Sao_Paulo");
+  long luz = c["display"]["luzSegundos"] | 60L;
+  a.luzSegundos = static_cast<uint16_t>(luz < 0 ? 0 : (luz > 600 ? 600 : luz));
+  a.travarComandos = c["display"]["travarComandos"] | false;
   a.drive = c["registro"]["drive"] | false;
   snprintf(a.driveUrl, sizeof(a.driveUrl), "%s", c["registro"]["driveUrl"] | "");
   if (strncmp(a.driveUrl, "https://", 8) != 0) a.drive = false;

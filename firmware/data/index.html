@@ -957,7 +957,7 @@ function htmlSetor(i) {
       <div class="campo"><label>Janela: início</label><input type="time" data-cfg="${p}.janela.0"></div>
       <div class="campo"><label>Janela: fim</label><input type="time" data-cfg="${p}.janela.1"></div>
     </div>
-    <p class="ajuda" style="margin-top:-8px">O controlador só rega este setor dentro da janela. Na aspersão, prefira a madrugada.</p>
+    <p class="ajuda" style="margin-top:-8px">Nas regas da agenda, o setor só começa dentro da janela; fora dela, é pulado. Ligar na mão não respeita a janela. Na aspersão, prefira a madrugada. Início depois do fim atravessa a meia-noite (22:00 a 06:00).</p>
     <details class="subsetor"><summary><span>Balanço hídrico</span><span class="suave">›</span></summary><div class="campos">
       ${campoNumero(`${p}.taxaMmH`, "Taxa de aplicação", "mm/h", 'min="0.1" max="100" step="0.1"', "Medida no campo: método dos copos (aspersão) ou vazão dos gotejadores (gotejo).")}
       ${campoNumero(`${p}.eficienciaPct`, "Eficiência", "%", 'min="10" max="100" step="1"')}
@@ -1035,7 +1035,7 @@ function htmlAjustes() {
       ${campoTexto("registro.driveUrl", "Endereço do Apps Script", "text", "", 'placeholder="https://script.google.com/macros/s/…/exec"')}
       ${campoNumero("registro.envioHoras", "Enviar a cada", "horas", 'min="1" max="168" step="1"')}`),
     grupo("Display e encoder", "interface na caixa", `
-      ${campoNumero("display.luzSegundos", "Luz de fundo apaga depois de", "s", 'min="0" max="600" step="5"', "0 deixa sempre acesa.")}
+      ${campoNumero("display.luzSegundos", "Tela apaga depois de", "s", 'min="0" max="600" step="5"', "0 deixa sempre acesa. O primeiro toque no botão só acende a tela. No ST7920, a luz de fundo fica acesa até ganhar um pino próprio.")}
       ${campoInterruptor("display.travarComandos", "Travar comandos no display", "O display só mostra informações; ligar e parar ficam só pela página.")}`),
     grupo("Segurança", "senha e sessão", `
       ${campoNumero("seguranca.sessaoMin", "Sair sozinho depois de", "min", 'min="5" max="1440" step="5"')}

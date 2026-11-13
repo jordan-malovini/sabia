@@ -44,6 +44,18 @@ struct Ajustes {
   ParametrosSolo solo;
   ParametrosSetor setores[NUM_SETORES];
 
+  // Janela de horário de cada setor (minuto do dia, pontas valendo)
+  uint16_t janelaInicio[NUM_SETORES] = {};
+  uint16_t janelaFim[NUM_SETORES] = {};
+
+  // Relógio
+  bool ntp = true;
+  int16_t fusoMin = -180;       // diferença para o UTC
+
+  // Display
+  uint16_t luzSegundos = 60;    // 0 = não apaga
+  bool travarComandos = false;
+
   // Envio ao Google Drive
   bool drive = false;
   char driveUrl[TAMANHO_URL] = "";
@@ -64,6 +76,10 @@ void dataDeDias(uint32_t dias, char saida[11]);
 // do erro; em caso de erro, `p` não é alterado.
 void programaParaJson(const Programa& p, JsonObject saida);
 const char* programaDeJson(JsonVariantConst entrada, Programa& p);
+
+// Fuso da página ("America/Sao_Paulo") em minutos em relação ao UTC.
+// O Brasil não tem horário de verão desde 2019. Fuso desconhecido: -180.
+int16_t fusoParaMinutos(const char* fuso);
 
 // Configuração de fábrica, sem os programas.
 void configPadrao(JsonDocument& doc);

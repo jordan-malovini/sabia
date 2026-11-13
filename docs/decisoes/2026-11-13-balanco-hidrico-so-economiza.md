@@ -50,5 +50,4 @@ Por isso o balanço **vem desligado de fábrica** ("Ajustar o tempo pelo balanç
 
 ## Ainda não feito
 
-- Janela de horário por setor (RF13): o campo existe nos ajustes, mas o firmware ainda não usa.
 - Regar **mais** que o programado quando o déficit é grande. Fica para depois da calibração.

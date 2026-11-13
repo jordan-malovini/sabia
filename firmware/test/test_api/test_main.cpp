@@ -130,6 +130,16 @@ void test_programa_invalido_nao_altera() {
   }
 }
 
+void test_fuso() {
+  TEST_ASSERT_EQUAL(-180, fusoParaMinutos("America/Sao_Paulo"));
+  TEST_ASSERT_EQUAL(-180, fusoParaMinutos("America/Bahia"));
+  TEST_ASSERT_EQUAL(-120, fusoParaMinutos("America/Noronha"));
+  TEST_ASSERT_EQUAL(-240, fusoParaMinutos("America/Cuiaba"));
+  TEST_ASSERT_EQUAL(-300, fusoParaMinutos("America/Rio_Branco"));
+  TEST_ASSERT_EQUAL(-180, fusoParaMinutos("Europe/Lisbon"));  // desconhecido
+  TEST_ASSERT_EQUAL(-180, fusoParaMinutos(nullptr));
+}
+
 void test_config_padrao_e_valida() {
   JsonDocument doc;
   configCompleta(doc);
@@ -233,6 +243,30 @@ void test_ler_ajustes() {
   doc["estacao"]["latitude"] = -14.79;
   doc["setores"][0]["taxaMmH"] = 0;  // taxa zero daria divisão por zero no tempo de rega
   TEST_ASSERT_NOT_NULL(strstr(validarConfig(doc.as<JsonVariantConst>()), "Setor 1"));
+
+  doc["setores"][0]["taxaMmH"] = 2.5;
+
+  // Janela, relógio e display
+  TEST_ASSERT_EQUAL_UINT16(0, a.janelaInicio[0]);
+  TEST_ASSERT_EQUAL_UINT16(1439, a.janelaFim[0]);
+  doc["setores"][1]["janela"][0] = "04:00";
+  doc["setores"][1]["janela"][1] = "08:30";
+  doc["relogio"]["fuso"] = "America/Manaus";
+  doc["display"]["luzSegundos"] = 0;
+  doc["display"]["travarComandos"] = true;
+  TEST_ASSERT_NULL(validarConfig(doc.as<JsonVariantConst>()));
+  lerAjustes(doc.as<JsonVariantConst>(), a);
+  TEST_ASSERT_EQUAL_UINT16(240, a.janelaInicio[1]);
+  TEST_ASSERT_EQUAL_UINT16(510, a.janelaFim[1]);
+  TEST_ASSERT_EQUAL(-240, a.fusoMin);
+  TEST_ASSERT_EQUAL_UINT16(0, a.luzSegundos);
+  TEST_ASSERT_TRUE(a.travarComandos);
+  TEST_ASSERT_TRUE(a.ntp);
+  doc["setores"][1]["janela"][1] = "8h";
+  TEST_ASSERT_NOT_NULL(strstr(validarConfig(doc.as<JsonVariantConst>()), "Setor 2"));
+  doc["setores"][1]["janela"][1] = "08:30";
+  doc["display"]["luzSegundos"] = 900;
+  TEST_ASSERT_NOT_NULL(validarConfig(doc.as<JsonVariantConst>()));
 
   // Documento vazio: tudo no padrão, sem travar.
   JsonDocument vazio;
@@ -401,6 +435,7 @@ int main() {
   RUN_TEST(test_programa_vai_e_volta);
   RUN_TEST(test_programa_como_a_pagina_envia);
   RUN_TEST(test_programa_invalido_nao_altera);
+  RUN_TEST(test_fuso);
   RUN_TEST(test_config_padrao_e_valida);
   RUN_TEST(test_config_invalida_diz_o_motivo);
   RUN_TEST(test_ler_ajustes);

@@ -15,12 +15,42 @@ namespace sabia {
 static BalancoHidrico balanco;
 static Chuva24h chuva24h;
 static uint32_t horaAbsoluta = 0;
+static uint16_t minutoDoDia = 0;
+static bool temHora = false;
 
+// Decide, nas regas automáticas, se e por quanto tempo cada setor rega:
+// primeiro a janela de horário (RF13), depois o balanço hídrico.
 class DecisorClima : public Decisor {
  public:
-  bool adiarInicio() override { return balancoAdiando(); }
-  uint32_t duracao(uint8_t setor, uint32_t programadaS) override {
-    return ajustes.balancoHidrico ? balanco.ajustar(setor, programadaS) : programadaS;
+  bool adiarInicio() override {
+    if (!balancoAdiando()) return false;
+    char texto[TAMANHO_EVENTO];
+    snprintf(texto, sizeof(texto), "Rega adiada: choveu %.1f mm em 24 h", static_cast<double>(balancoChuva24hMm()));
+    registrarEvento(texto);
+    return true;
+  }
+
+  uint32_t duracao(uint8_t setor, uint32_t programadaS, uint32_t depoisS) override {
+    char texto[TAMANHO_EVENTO];
+    if (temHora) {
+      // A hora em que o setor deve começar, contando os setores antes dele.
+      uint16_t comeca = static_cast<uint16_t>((minutoDoDia + depoisS / 60UL) % 1440UL);
+      if (!dentroDaJanela(comeca, ajustes.janelaInicio[setor - 1], ajustes.janelaFim[setor - 1])) {
+        snprintf(texto, sizeof(texto), "Setor %u fora da janela de horario: nao regou", setor);
+        registrarEvento(texto);
+        return 0;
+      }
+    }
+    if (!ajustes.balancoHidrico) return programadaS;
+    uint32_t ajustada = balanco.ajustar(setor, programadaS);
+    if (ajustada == 0) {
+      snprintf(texto, sizeof(texto), "Setor %u com agua no solo: nao regou", setor);
+      registrarEvento(texto);
+    } else if (ajustada < programadaS) {
+      snprintf(texto, sizeof(texto), "Setor %u: balanco reduziu para %lu min", setor, static_cast<unsigned long>((ajustada + 30) / 60));
+      registrarEvento(texto);
+    }
+    return ajustada;
   }
 };
 static DecisorClima decisor;
@@ -43,7 +73,10 @@ void balancoIniciar() {
 }
 
 void balancoTick(const DadosTela& d) {
-  if (d.temHora) horaAbsoluta = minutoAbsoluto(d.agora) / 60UL;
+  temHora = d.temHora;
+  if (!d.temHora) return;
+  horaAbsoluta = minutoAbsoluto(d.agora) / 60UL;
+  minutoDoDia = static_cast<uint16_t>(d.hora * 60 + d.minuto);
 }
 
 void balancoChuva(float mm) { chuva24h.somar(horaAbsoluta, mm); }

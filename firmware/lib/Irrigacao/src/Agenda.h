@@ -64,6 +64,10 @@ struct Programa {
 
 bool diaPermitido(const Programa& p, uint32_t dias);
 
+// Janela de horário de um setor, com as duas pontas valendo. Se o início é
+// depois do fim, a janela atravessa a meia-noite (22:00 a 06:00).
+bool dentroDaJanela(uint16_t minutoDoDia, uint16_t inicio, uint16_t fim);
+
 // Quem decide, pelo clima, se um início automático acontece e por quanto
 // tempo cada setor rega (o balanço hídrico). Sem decisor, vale o programa.
 // Não vale para programas iniciados na mão.
@@ -71,7 +75,9 @@ class Decisor {
  public:
   virtual ~Decisor() = default;
   virtual bool adiarInicio() = 0;  // true: este início é pulado (choveu)
-  virtual uint32_t duracao(uint8_t setor, uint32_t programadaS) = 0;  // setor de 1 a 8
+  // Tempo de rega do setor (1 a 8). `depoisS` é quanto depois do início do
+  // programa o setor deve começar, somando os setores antes dele.
+  virtual uint32_t duracao(uint8_t setor, uint32_t programadaS, uint32_t depoisS) = 0;
 };
 
 class Agenda {
