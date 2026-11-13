@@ -2,6 +2,7 @@
 // Rodar no PC: pio test -e native
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <unity.h>
