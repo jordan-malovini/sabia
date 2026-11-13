@@ -16,9 +16,16 @@ imagem = "$BUILD_DIR/sabia-wokwi.bin"
 placa = env.BoardConfig()  # noqa: F821
 
 
+def esptool(env):
+    # Nas versões antigas da plataforma o esptool é um script Python; nas
+    # novas, um executável. Os dois aceitam os mesmos argumentos.
+    caminho = env.subst("$OBJCOPY")
+    return ["$PYTHONEXE", "$OBJCOPY"] if caminho.endswith(".py") else ["$OBJCOPY"]
+
+
 def juntar(source, target, env):
     partes = env.Flatten(env.get("FLASH_EXTRA_IMAGES", [])) + ["$ESP32_APP_OFFSET", programa]
-    comando = ["$PYTHONEXE", "$OBJCOPY", "--chip", placa.get("build.mcu", "esp32s3"), "merge_bin",
+    comando = esptool(env) + ["--chip", placa.get("build.mcu", "esp32s3"), "merge_bin",
                "--flash_mode", "dio", "--flash_size", placa.get("upload.flash_size", "8MB"), "-o", imagem] + partes
     env.Execute(" ".join('"%s"' % p if " " in env.subst(p) else p for p in comando))
 
