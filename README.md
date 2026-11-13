@@ -70,6 +70,8 @@ O firmware usa o **PlatformIO** (extensão do VS Code). Abra a pasta `firmware/`
 
 O BME280 e o VEML7700 não existem no Wokwi e ficam para a bancada.
 
+**Roteiro de teste:** [docs/teste-wokwi.md](docs/teste-wokwi.md) testa tudo no simulador, passo a passo, com o resultado esperado de cada um.
+
 **Na tela:** clique abre o menu. Para ligar um setor: gire até o setor, clique, gire para escolher o tempo e clique. O menu também tem "Programa A/B/C agora", **"Programar agenda"** (ligar o programa, horários de início, dias, tempo de cada setor e ajuste) e "Pausa por chuva". O clique longo volta um nível, e na tela inicial ele para tudo.
 
 **No monitor serial:** `l` pergunta o setor e depois o tempo; `l N S` liga o setor N por S segundos de uma vez; `c S` faz o ciclo; `p` pula; `x N` para o setor N; `s` para tudo; `?` mostra o estado.
