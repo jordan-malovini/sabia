@@ -1,5 +1,6 @@
 #include "ApiJson.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -333,6 +334,11 @@ void lerAjustes(JsonVariantConst c, Ajustes& a) {
   a.sessaoMin = c["seguranca"]["sessaoMin"] | 30;
   a.mmPorBasculada = c["estacao"]["mmPorBasculada"] | 0.2f;
   if (a.mmPorBasculada < 0.01f || a.mmPorBasculada > 2.0f) a.mmPorBasculada = 0.2f;
+  a.ajusteTempC = c["estacao"]["ajusteTempC"] | 0.0f;
+  if (a.ajusteTempC < -10.0f || a.ajusteTempC > 10.0f) a.ajusteTempC = 0;
+  a.diasNoCartao = c["registro"]["diasNoCartao"] | 7;
+  if (a.diasNoCartao < 1) a.diasNoCartao = 1;
+  if (a.diasNoCartao > 60) a.diasNoCartao = 60;
 }
 
 // ---------------------------------------------------------------------------
@@ -393,6 +399,106 @@ void regaParaJson(JsonObject o, const Controlador& c, const Agenda& a, bool temH
     o["proximaRega"] = static_cast<const char*>(nullptr);
   }
   o["pausaChuvaDias"] = temHora ? a.diasSuspensos(agora) : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Histórico
+// ---------------------------------------------------------------------------
+static void medida(JsonArray lista, float v) {
+  if (isnan(v)) lista.add(static_cast<const char*>(nullptr));
+  else lista.add(roundf(v * 10.0f) / 10.0f);
+}
+
+static void eventosParaJson(JsonObject o, const RegistroDia& hoje) {
+  JsonArray eventos = o["eventos"].to<JsonArray>();
+  for (uint8_t i = 0; i < hoje.totalEventos(); i++) {
+    const Evento& e = hoje.eventoRecente(i);
+    JsonArray par = eventos.add<JsonArray>();
+    char hora[6];
+    textoDeHora(e.minutoDoDia, hora);
+    par.add(hora);
+    par.add(e.texto);
+  }
+}
+
+static void regasParaJson(JsonObject o, const uint32_t vezes[NUM_SETORES], const uint32_t minutos[NUM_SETORES],
+                          const char* const nomes[NUM_SETORES]) {
+  JsonArray regas = o["regas"].to<JsonArray>();
+  for (uint8_t s = 0; s < NUM_SETORES; s++) {
+    if (vezes[s] == 0) continue;
+    JsonObject r = regas.add<JsonObject>();
+    r["setor"] = s + 1;
+    r["nome"] = nomes[s];
+    r["vezes"] = vezes[s];
+    r["minutos"] = minutos[s];
+  }
+}
+
+void historicoHojeParaJson(JsonObject o, const RegistroDia& hoje, const char* const nomes[NUM_SETORES]) {
+  JsonArray rotulos = o["rotulos"].to<JsonArray>();
+  JsonArray chuva = o["chuvaMm"].to<JsonArray>();
+  JsonArray temp = o["tempMaxC"].to<JsonArray>();
+  for (uint8_t h = 0; h < 24; h++) {
+    char rotulo[5];
+    snprintf(rotulo, sizeof(rotulo), "%uh", h);
+    rotulos.add(rotulo);
+    medida(chuva, hoje.chuvaHoraMm(h));
+    medida(temp, hoje.tempHoraC(h));
+  }
+  o["tempMinC"] = static_cast<const char*>(nullptr);
+  o["et0Mm"] = static_cast<const char*>(nullptr);
+  uint32_t vezes[NUM_SETORES], minutos[NUM_SETORES];
+  for (uint8_t s = 0; s < NUM_SETORES; s++) {
+    vezes[s] = hoje.vezes(s + 1);
+    minutos[s] = (hoje.segundos(s + 1) + 30) / 60;
+  }
+  regasParaJson(o, vezes, minutos, nomes);
+  eventosParaJson(o, hoje);
+}
+
+void historicoDiasParaJson(JsonObject o, uint16_t nDias, const ResumoDia* resumos, size_t nResumos, const RegistroDia& hoje,
+                           float et0HojeMm, const char* const nomes[NUM_SETORES]) {
+  static const char* const DIAS[7] = {"dom", "seg", "ter", "qua", "qui", "sex", "sáb"};
+  JsonArray rotulos = o["rotulos"].to<JsonArray>();
+  JsonArray chuva = o["chuvaMm"].to<JsonArray>();
+  JsonArray maxima = o["tempMaxC"].to<JsonArray>();
+  JsonArray minima = o["tempMinC"].to<JsonArray>();
+  JsonArray et0 = o["et0Mm"].to<JsonArray>();
+  uint32_t vezes[NUM_SETORES] = {}, minutos[NUM_SETORES] = {};
+  ResumoDia resumoHoje = hoje.resumo(et0HojeMm);
+  if (nDias < 1) nDias = 1;
+
+  for (uint16_t i = 0; i < nDias; i++) {
+    uint32_t atras = static_cast<uint32_t>(nDias - 1 - i);
+    uint32_t dia = hoje.dia() >= atras ? hoje.dia() - atras : 0;
+    const ResumoDia* r = dia == hoje.dia() ? &resumoHoje : nullptr;
+    for (size_t k = 0; r == nullptr && k < nResumos; k++) if (resumos[k].dia == dia) r = &resumos[k];
+
+    if (nDias <= 7) {
+      rotulos.add(DIAS[diaDaSemana(dia)]);
+    } else {
+      char rotulo[4];
+      snprintf(rotulo, sizeof(rotulo), "%u", diaDoMes(dia));
+      rotulos.add(rotulo);
+    }
+    if (r == nullptr) {  // dia sem registro
+      medida(chuva, 0);
+      medida(maxima, NAN);
+      medida(minima, NAN);
+      medida(et0, NAN);
+      continue;
+    }
+    medida(chuva, r->chuvaMm);
+    medida(maxima, r->tempMaxC);
+    medida(minima, r->tempMinC);
+    medida(et0, r->et0Mm);
+    for (uint8_t s = 0; s < NUM_SETORES; s++) {
+      vezes[s] += r->vezes[s];
+      minutos[s] += r->minutos[s];
+    }
+  }
+  regasParaJson(o, vezes, minutos, nomes);
+  eventosParaJson(o, hoje);
 }
 
 }  // namespace sabia

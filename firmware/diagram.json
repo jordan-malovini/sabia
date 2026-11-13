@@ -132,6 +132,13 @@
         "color": "blue",
         "label": "Pluviômetro (1 clique = 0,2 mm)"
       }
+    },
+    {
+      "type": "wokwi-microsd-card",
+      "id": "sd",
+      "top": 300,
+      "left": 620,
+      "attrs": {}
     }
   ],
   "connections": [
@@ -341,6 +348,42 @@
     ],
     [
       "chuva:2.l",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "sd:CS",
+      "esp:38",
+      "green",
+      []
+    ],
+    [
+      "sd:SCK",
+      "esp:39",
+      "orange",
+      []
+    ],
+    [
+      "sd:DO",
+      "esp:40",
+      "blue",
+      []
+    ],
+    [
+      "sd:DI",
+      "esp:41",
+      "yellow",
+      []
+    ],
+    [
+      "sd:VCC",
+      "esp:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "sd:GND",
       "esp:GND.1",
       "black",
       []

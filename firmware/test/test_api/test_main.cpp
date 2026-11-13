@@ -1,6 +1,7 @@
 // Testes da conversão entre o JSON da página e os dados do firmware.
 // Rodar no PC: pio test -e native
 
+#include <math.h>
 #include <string.h>
 
 #include <ArduinoJson.h>
@@ -292,6 +293,76 @@ void test_fila_inclui_o_setor_que_esta_entrando() {
   TEST_ASSERT_EQUAL(3, doc["fila"][1]["setor"].as<int>());
 }
 
+static const char* const NOMES[NUM_SETORES] = {"Horta", "Setor 2", "Setor 3", "Setor 4", "Setor 5", "Setor 6", "Setor 7", "Setor 8"};
+
+void test_historico_de_hoje() {
+  RegistroDia hoje;
+  hoje.iniciar(diasDesde2000(2026, 11, 13));
+  HoraClima h;
+  h.tempMaxC = 30.26f;
+  h.tempMinC = 28;
+  hoje.clima(14 * 60, h);
+  hoje.chuva(13 * 60 + 10, 2.2f);
+  hoje.rega(6 * 60, 1, 2100);
+  hoje.evento(7 * 60, "Ajustes salvos");
+
+  JsonDocument doc;
+  historicoHojeParaJson(doc.to<JsonObject>(), hoje, NOMES);
+  TEST_ASSERT_EQUAL(24, doc["rotulos"].size());
+  TEST_ASSERT_EQUAL_STRING("13h", doc["rotulos"][13].as<const char*>());
+  TEST_ASSERT_TRUE(doc["chuvaMm"][13].as<float>() > 2.19f && doc["chuvaMm"][13].as<float>() < 2.21f);
+  TEST_ASSERT_TRUE(doc["chuvaMm"][12].as<float>() == 0);
+  TEST_ASSERT_TRUE(doc["tempMaxC"][14].as<float>() > 30.29f && doc["tempMaxC"][14].as<float>() < 30.31f);
+  TEST_ASSERT_TRUE(doc["tempMaxC"][3].isNull());  // hora sem leitura
+  TEST_ASSERT_TRUE(doc["tempMinC"].isNull());
+  TEST_ASSERT_EQUAL(1, doc["regas"].size());       // só os setores que regaram
+  TEST_ASSERT_EQUAL_STRING("Horta", doc["regas"][0]["nome"].as<const char*>());
+  TEST_ASSERT_EQUAL(35, doc["regas"][0]["minutos"].as<int>());
+  TEST_ASSERT_EQUAL(2, doc["eventos"].size());
+  TEST_ASSERT_EQUAL_STRING("07:00", doc["eventos"][0][0].as<const char*>());
+  TEST_ASSERT_EQUAL_STRING("Ajustes salvos", doc["eventos"][0][1].as<const char*>());
+}
+
+void test_historico_de_varios_dias() {
+  RegistroDia hoje;
+  hoje.iniciar(diasDesde2000(2026, 11, 13));  // sexta
+  hoje.chuva(600, 1.0f);
+  hoje.rega(700, 2, 600);
+
+  ResumoDia resumos[2];
+  resumos[0].dia = hoje.dia() - 1;
+  resumos[0].chuvaMm = 12;
+  resumos[0].tempMaxC = 29.5f;
+  resumos[0].tempMinC = 20.2f;
+  resumos[0].et0Mm = 3.0f;
+  resumos[0].vezes[1] = 2;
+  resumos[0].minutos[1] = 50;
+  resumos[1].dia = hoje.dia() - 20;  // fora dos 7 dias
+  resumos[1].chuvaMm = 99;
+
+  JsonDocument doc;
+  historicoDiasParaJson(doc.to<JsonObject>(), 7, resumos, 2, hoje, 4.1f, NOMES);
+  TEST_ASSERT_EQUAL(7, doc["rotulos"].size());
+  TEST_ASSERT_EQUAL_STRING("sex", doc["rotulos"][6].as<const char*>());
+  TEST_ASSERT_EQUAL_STRING("qui", doc["rotulos"][5].as<const char*>());
+  TEST_ASSERT_EQUAL_STRING("sáb", doc["rotulos"][0].as<const char*>());
+  TEST_ASSERT_EQUAL(12, doc["chuvaMm"][5].as<int>());
+  TEST_ASSERT_EQUAL(1, doc["chuvaMm"][6].as<int>());
+  TEST_ASSERT_EQUAL(0, doc["chuvaMm"][0].as<int>());   // dia sem registro
+  TEST_ASSERT_TRUE(doc["tempMaxC"][0].isNull());
+  TEST_ASSERT_TRUE(doc["et0Mm"][6].as<float>() > 4.0f);
+  TEST_ASSERT_EQUAL(1, doc["regas"].size());
+  TEST_ASSERT_EQUAL(2, doc["regas"][0]["setor"].as<int>());
+  TEST_ASSERT_EQUAL(3, doc["regas"][0]["vezes"].as<int>());     // 2 de ontem + 1 de hoje
+  TEST_ASSERT_EQUAL(60, doc["regas"][0]["minutos"].as<int>());
+
+  historicoDiasParaJson(doc.to<JsonObject>(), 30, resumos, 2, hoje, NAN, NOMES);
+  TEST_ASSERT_EQUAL(30, doc["rotulos"].size());
+  TEST_ASSERT_EQUAL_STRING("13", doc["rotulos"][29].as<const char*>());
+  TEST_ASSERT_EQUAL(99, doc["chuvaMm"][9].as<int>());  // 20 dias atrás
+  TEST_ASSERT_TRUE(doc["et0Mm"][29].isNull());
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_hora_de_texto);
@@ -305,5 +376,7 @@ int main() {
   RUN_TEST(test_mesclar_completa_config_antiga);
   RUN_TEST(test_estado_da_rega);
   RUN_TEST(test_fila_inclui_o_setor_que_esta_entrando);
+  RUN_TEST(test_historico_de_hoje);
+  RUN_TEST(test_historico_de_varios_dias);
   return UNITY_END();
 }

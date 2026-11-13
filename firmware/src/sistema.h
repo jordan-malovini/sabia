@@ -12,6 +12,7 @@
 #include "Agenda.h"
 #include "ApiJson.h"
 #include "Controlador.h"
+#include "Registro.h"
 #include "Retomada.h"
 #include "interface.h"
 
@@ -44,6 +45,26 @@ void pedirReinicio();  // reinicia o ESP daqui a instantes, depois de responder
 void configCarregar(JsonDocument& doc);   // padrão de fábrica + o que está gravado
 bool configGravar(JsonDocument& doc);     // tira o que não fica no documento e grava
 void configAplicar(JsonVariantConst cfg); // passa a valer para o controlador
+
+// Sensores de clima (sensores.cpp).
+void sensoresIniciar();
+bool sensoresTick(uint32_t agoraMs);     // true quando fez uma leitura nova
+const Leitura& sensoresLeitura();        // última leitura; NAN no que não há
+
+// Registro e histórico (registro.cpp).
+void registroIniciar();
+void registroAoFecharDia(float (*et0)());  // de onde vem a ET0 do dia, para o resumo
+void registroTick(const DadosTela& dados, uint32_t pulsosChuva);
+void registroLeitura(const Leitura& leitura);
+void registrarRega(uint8_t setor, uint32_t segundos);
+void registrarEvento(const char* texto);
+const RegistroDia& registroHoje();
+float registroChuvaHojeMm();
+float registroChuvaMesMm();
+bool registroTemArmazenamento();
+bool registroNoCartao();
+int registroUsoPct();                    // -1 se não deu para medir
+bool registroHistorico(const char* periodo, JsonObject saida, const char* const nomes[NUM_SETORES]);
 
 // Servidor web e Wi-Fi (web.cpp).
 void webIniciar();

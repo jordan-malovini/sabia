@@ -30,7 +30,7 @@ const fake = {
   estado() {
     return {
       versao: "0.4-dev", hora: "2026-11-13T05:10:00-03:00",
-      sistema: { wifi: true, ip: "192.168.0.50", modoAp: false, cartaoSd: null, drive: { ativo: false }, rtc: true, ligadoHa: 120 },
+      sistema: { wifi: true, ip: "192.168.0.50", modoAp: false, cartaoSd: { ok: true, naFlash: true, usoPct: 3 }, drive: { ativo: false }, rtc: true, ligadoHa: 120 },
       sessao: { logado: this.logado, senhaPadrao: this.senhaPadrao },
       atual: this.atual, fila: this.fila,
       proximaRega: { programa: "A", hora: "06:00", quando: "hoje", faltamMin: 50 }, pausaChuvaDias: this.pausa,
@@ -51,7 +51,15 @@ const servidor = createServer((req, res) => {
     if (u.pathname === "/") { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }); return res.end(pagina); }
     if (u.pathname === "/api/estado") return json(fake.estado());
     if (u.pathname === "/api/config" && req.method === "GET") return json(fake.config);
-    if (u.pathname === "/api/historico") return json({ rotulos: [], chuvaMm: [], tempMaxC: [], tempMinC: [], et0Mm: [], regas: [], eventos: [] });
+    if (u.pathname === "/api/historico") {
+      if (fake.semRelogio) return json({ rotulos: [], chuvaMm: [], tempMaxC: [], tempMinC: [], et0Mm: [], regas: [], eventos: [] });
+      if (u.searchParams.get("periodo") === "7d") return json({ rotulos: ["sáb", "dom", "seg", "ter", "qua", "qui", "sex"], chuvaMm: [0, 0, 12, 0, 0, 3.4, 0.4],
+        tempMaxC: [null, null, 29.5, 30.1, null, 31, 30.2], tempMinC: [null, null, 20.2, 21, null, 21.4, 22], et0Mm: [null, null, null, null, null, null, null],
+        regas: [{ setor: 2, nome: "Setor 2", vezes: 3, minutos: 60 }], eventos: [["05:02", "Controlador ligado"]] });
+      // Hoje, como o firmware manda sem sensor de temperatura: tudo nulo.
+      return json({ rotulos: Array.from({ length: 24 }, (_, h) => `${h}h`), chuvaMm: Array.from({ length: 24 }, (_, h) => (h === 4 ? 0.4 : 0)),
+        tempMaxC: Array(24).fill(null), tempMinC: null, et0Mm: null, regas: [], eventos: [["05:02", "Controlador ligado"]] });
+    }
     if (u.pathname === "/api/sessao" && req.method === "POST") {
       if (JSON.parse(corpo).senha !== "sabia1234") return erro(401, "Senha incorreta");
       fake.logado = true;
@@ -112,6 +120,9 @@ ok((await texto("#numeros")).includes("0,4") && (await texto("#numeros")).includ
 ok(!(await texto("#listaSetores")).includes("Água no solo"), "sem balanço hídrico, a barra de água no solo some");
 ok((await texto("#listaSetores")).includes("06:00 · prog. A · 25 min"), "próxima rega de cada setor sai da agenda");
 ok((await texto("#textoStatus")) === "Troque a senha", "avisa que a senha ainda é a de fábrica");
+await clicar('#chipStatus'); await espera(200);
+ok((await texto("#listaStatus")).includes("gravando na memória interna · 3% usado"), "status diz onde o registro está sendo gravado");
+await ev(`document.querySelector('#dlgStatus').close()`);
 ok((await texto("#destaque")).includes("Retomando Setor 3 e mais 1 em 1:35"), "mostra a contagem da retomada depois da queda de energia");
 
 await clicar('[data-acao="cancelarRetomada"]'); await espera(100);
@@ -133,7 +144,14 @@ await clicar('[data-ligar="8"]'); await espera(100); await clicar('#dlgLigarOk')
 ok((await texto("#toast")).includes("desativado"), "a recusa do controlador aparece com o motivo");
 
 await ev(`location.hash='#historico'`); await espera(800);
-ok((await texto("#graficos")).includes("Ainda não há histórico") && await ev(`document.querySelector('[data-csv="chuva"]').disabled`), "histórico vazio explica o motivo e desliga os CSV");
+ok((await texto("#graficos")).includes("total 0,4 mm") && (await texto("#graficos")).includes("Sem leituras de temperatura"), "histórico de hoje sem sensor: chuva aparece e a temperatura avisa que não há leitura");
+ok((await texto("#tabelaRegas")).includes("Nenhuma rega") && (await texto("#eventos")).includes("Controlador ligado"), "sem regas, a tabela diz isso; eventos aparecem");
+await clicar('#periodos [data-p="7d"]'); await espera(800);
+ok(await ev(`document.querySelectorAll('#graficos svg polyline, #graficos svg circle').length >= 2 && !document.querySelector('#graficos').innerHTML.includes('NaN')`), "7 dias com dias sem leitura: a linha tem buracos, sem NaN");
+ok((await texto("#tabelaRegas")).includes("Setor 2"), "regas do período aparecem");
+fake.semRelogio = true;
+await clicar('#periodos [data-p="30d"]'); await espera(800);
+ok((await texto("#graficos")).includes("Ainda não há histórico") && await ev(`document.querySelector('[data-csv="chuva"]').disabled`), "sem relógio, o histórico explica o motivo e desliga os CSV");
 
 await ev(`location.hash='#ajustes'`); await espera(800);
 ok((await texto("#formAjustes")).includes("Programa A"), "ajustes carregam a configuração do controlador");

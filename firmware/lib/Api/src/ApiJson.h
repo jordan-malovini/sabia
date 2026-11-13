@@ -15,6 +15,7 @@
 
 #include "Agenda.h"
 #include "Controlador.h"
+#include "Registro.h"
 #include "Retomada.h"
 
 namespace sabia {
@@ -30,6 +31,8 @@ struct Ajustes {
   uint16_t duracaoPadraoMin[NUM_SETORES] = {};
   uint16_t sessaoMin = 30;
   float mmPorBasculada = 0.2f;
+  float ajusteTempC = 0;        // correção do termômetro
+  uint16_t diasNoCartao = 7;    // quantos arquivos diários ficam guardados
 };
 
 // "HH:MM" <-> minuto do dia.
@@ -63,5 +66,13 @@ void lerAjustes(JsonVariantConst cfg, Ajustes& ajustes);
 // "pausaChuvaDias".
 void regaParaJson(JsonObject saida, const Controlador& controlador, const Agenda& agenda, bool temHora,
                   const Momento& agora);
+
+// Histórico (GET /api/historico). `nomes` são os nomes dos 8 setores.
+// Hoje: 24 horas, com a chuva e a temperatura de cada hora.
+void historicoHojeParaJson(JsonObject saida, const RegistroDia& hoje, const char* const nomes[NUM_SETORES]);
+// Últimos `nDias` dias, terminando em hoje. `resumos` traz os dias já
+// encerrados que existirem, em qualquer ordem; dia sem registro sai zerado.
+void historicoDiasParaJson(JsonObject saida, uint16_t nDias, const ResumoDia* resumos, size_t nResumos, const RegistroDia& hoje,
+                           float et0HojeMm, const char* const nomes[NUM_SETORES]);
 
 }  // namespace sabia

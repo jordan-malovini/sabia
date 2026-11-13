@@ -21,6 +21,7 @@
 #include <WiFi.h>
 #include <esp_system.h>
 #include <esp_timer.h>
+#include <math.h>
 #include <mbedtls/md.h>
 #if __has_include(<esp_random.h>)
 #include <esp_random.h>
@@ -361,7 +362,11 @@ static void tratarEstado() {
     sistema["wifi"] = conectado;
     sistema["ip"] = conectado ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
     sistema["modoAp"] = apLigado && !conectado;
-    sistema["cartaoSd"] = static_cast<const char*>(nullptr);  // registro no cartão ainda não existe
+    JsonObject cartao = sistema["cartaoSd"].to<JsonObject>();
+    cartao["ok"] = registroTemArmazenamento();
+    cartao["naFlash"] = !registroNoCartao();  // sem cartão, o registro vai para a memória interna
+    if (registroUsoPct() >= 0) cartao["usoPct"] = registroUsoPct();
+    else cartao["usoPct"] = static_cast<const char*>(nullptr);
     sistema["drive"]["ativo"] = false;
     sistema["rtc"] = temRelogio();
     sistema["ligadoHa"] = static_cast<uint32_t>(esp_timer_get_time() / 1000000LL);
@@ -382,10 +387,23 @@ static void tratarEstado() {
       doc["retomada"] = static_cast<const char*>(nullptr);
     }
 
-    // Sensores de clima e balanço hídrico ainda não existem: só a chuva de hoje.
+    // Sem sensor (ou sem leitura ainda), o campo vai vazio. A ET0 vem com o balanço hídrico.
     JsonObject clima = doc["clima"].to<JsonObject>();
-    clima["chuvaHojeMm"] = serialized(String(d.chuvaMm, 1));
-    for (const char* campo : {"chuvaMesMm", "tempC", "tempMaxC", "tempMinC", "et0HojeMm"}) clima[campo] = static_cast<const char*>(nullptr);
+    const Leitura& leitura = sensoresLeitura();
+    const RegistroDia& hoje = registroHoje();
+    auto medida = [&clima](const char* campo, float v, int casas) {
+      if (isnan(v)) clima[campo] = static_cast<const char*>(nullptr);
+      else clima[campo] = serialized(String(v, static_cast<unsigned int>(casas)));
+    };
+    medida("chuvaHojeMm", d.chuvaMm, 1);
+    medida("chuvaMesMm", d.temHora ? registroChuvaMesMm() : NAN, 1);
+    medida("tempC", leitura.tempC, 1);
+    medida("tempMaxC", hoje.tempMaxC(), 1);
+    medida("tempMinC", hoje.tempMinC(), 1);
+    medida("umidadePct", leitura.umidadePct, 0);
+    medida("pressaoHpa", leitura.pressaoHpa, 1);
+    medida("lux", leitura.lux, 0);
+    medida("et0HojeMm", NAN, 1);
 
     JsonArray setores = doc["setores"].to<JsonArray>();
     for (uint8_t i = 0; i < NUM_SETORES; i++) {
@@ -455,6 +473,10 @@ static const char* executarComando(JsonVariantConst c) {
     if (!d.temHora) return "Sem relógio, a agenda não roda";
     agenda.suspender(static_cast<uint8_t>(dias), d.agora);
     salvarAgenda();
+    char texto[TAMANHO_EVENTO];
+    if (dias > 0) snprintf(texto, sizeof(texto), "Regas em pausa por chuva: %ld dia(s)", dias);
+    else snprintf(texto, sizeof(texto), "Pausa por chuva cancelada");
+    registrarEvento(texto);
     return nullptr;
   }
   if (strcmp(acao, "acertarHora") == 0) {
@@ -467,8 +489,12 @@ static const char* executarComando(JsonVariantConst c) {
       return "Hora em formato inválido";
     }
     if (!temRelogio()) return "Relógio (RTC) não encontrado";
-    return acertarRelogio(static_cast<uint16_t>(ano), static_cast<uint8_t>(mes), static_cast<uint8_t>(dia), static_cast<uint8_t>(hora),
-                          static_cast<uint8_t>(minuto), static_cast<uint8_t>(segundo)) ? nullptr : "Hora fora da faixa";
+    if (!acertarRelogio(static_cast<uint16_t>(ano), static_cast<uint8_t>(mes), static_cast<uint8_t>(dia), static_cast<uint8_t>(hora),
+                        static_cast<uint8_t>(minuto), static_cast<uint8_t>(segundo))) {
+      return "Hora fora da faixa";
+    }
+    registrarEvento("Hora acertada pela pagina");
+    return nullptr;
   }
   if (strcmp(acao, "retomar") == 0 || strcmp(acao, "cancelarRetomada") == 0) {
     if (!retomada.aguardando()) return "Não há rega esperando para retomar";
@@ -539,8 +565,12 @@ static void tratarGravarConfig() {
       if (apSenha[0] != 0) memoria.putString("apSenha", apSenha);
       if (novaSenha[0] != 0) gravarSenha(novaSenha);
 
-      if (!configGravar(doc)) erro = "Não foi possível gravar os ajustes";
-      else configAplicar(doc.as<JsonVariantConst>());
+      if (!configGravar(doc)) {
+        erro = "Não foi possível gravar os ajustes";
+      } else {
+        configAplicar(doc.as<JsonVariantConst>());
+        registrarEvento("Ajustes salvos pela pagina");
+      }
     }
   }
   if (erro.length() > 0) {
@@ -552,13 +582,67 @@ static void tratarGravarConfig() {
 }
 
 // ---------------------------------------------------------------------------
-// Histórico: depende do registro no cartão SD, que ainda não existe.
+// Histórico
 // ---------------------------------------------------------------------------
-static void tratarHistorico() {
-  responderJson("{\"rotulos\":[],\"chuvaMm\":[],\"tempMaxC\":[],\"tempMinC\":[],\"et0Mm\":[],\"regas\":[],\"eventos\":[]}");
+// Monta o histórico do período pedido. Devolve false sem relógio (sem data não há registro).
+static bool montarHistorico(JsonDocument& doc) {
+  Trava t;
+  JsonDocument config;
+  configCarregar(config);
+  const char* nomes[NUM_SETORES];
+  for (uint8_t i = 0; i < NUM_SETORES; i++) nomes[i] = config["setores"][i]["nome"] | "Setor";
+  String periodo = servidor.arg("periodo");
+  return registroHistorico(periodo.c_str(), doc.to<JsonObject>(), nomes);
 }
 
-static void tratarCsv() { responderErro(404, "O histórico ainda não é gravado. Ele chega junto com o registro no cartão SD."); }
+static void tratarHistorico() {
+  JsonDocument doc;
+  if (!montarHistorico(doc)) {
+    responderJson("{\"rotulos\":[],\"chuvaMm\":[],\"tempMaxC\":[],\"tempMinC\":[],\"et0Mm\":[],\"regas\":[],\"eventos\":[]}");
+    return;
+  }
+  String corpo;
+  serializeJson(doc, corpo);
+  responderJson(corpo);
+}
+
+// Número para o CSV: vírgula decimal, vazio se não há dado.
+static String numeroCsv(JsonVariantConst v) {
+  if (v.isNull()) return String();
+  String texto(v.as<float>(), static_cast<unsigned int>(1));
+  texto.replace('.', ',');
+  return texto;
+}
+
+static void tratarCsv() {
+  JsonDocument doc;
+  if (!montarHistorico(doc)) {
+    responderErro(404, "Sem relógio não há registro para baixar");
+    return;
+  }
+  String tipo = servidor.arg("tipo"), periodo = servidor.arg("periodo");
+  if (tipo != "chuva" && tipo != "clima" && tipo != "regas") tipo = "chuva";
+  if (periodo != "7d" && periodo != "30d") periodo = "hoje";
+  String csv;
+  JsonArrayConst rotulos = doc["rotulos"].as<JsonArrayConst>();
+  if (tipo == "regas") {
+    csv = "setor;nome;regas;minutos\r\n";
+    for (JsonVariantConst r : doc["regas"].as<JsonArrayConst>()) {
+      csv += String(r["setor"].as<int>()) + ';' + (r["nome"] | "") + ';' + String(r["vezes"].as<int>()) + ';' + String(r["minutos"].as<int>()) + "\r\n";
+    }
+  } else if (tipo == "chuva") {
+    csv = "periodo;chuva_mm\r\n";
+    for (size_t i = 0; i < rotulos.size(); i++) csv += String(rotulos[i] | "") + ';' + numeroCsv(doc["chuvaMm"][i]) + "\r\n";
+  } else {
+    csv = "periodo;temp_max_c;temp_min_c;et0_mm\r\n";
+    for (size_t i = 0; i < rotulos.size(); i++) {
+      csv += String(rotulos[i] | "") + ';' + numeroCsv(doc["tempMaxC"][i]) + ';' + numeroCsv(doc["tempMinC"][i]) + ';' + numeroCsv(doc["et0Mm"][i]) + "\r\n";
+    }
+  }
+  servidor.sendHeader("Content-Disposition", String("attachment; filename=\"sabia-") + tipo + "-" + periodo + ".csv\"");
+  servidor.sendHeader("Cache-Control", "no-store");
+  servidor.send(200, "text/csv; charset=utf-8", String("\xEF\xBB\xBF") + csv);  // com BOM, para o Excel ler os acentos
+}
 
 static void tratarPagina() {
   servidor.sendHeader("Content-Encoding", "gzip");
