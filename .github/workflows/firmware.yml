@@ -56,9 +56,25 @@ jobs:
         run: pip install platformio
       - name: Compilar
         run: pio run -e ${{ matrix.env }}
+      - name: Conferir a imagem do Wokwi
+        if: matrix.env == 'esp32s3'
+        run: |
+          python -m esptool image_info .pio/build/esp32s3/firmware.bin | head -5 || true
+          ls -l .pio/build/esp32s3/sabia-wokwi.bin .pio/build/esp32s3/firmware.bin
+          # O programa começa em 0x10000 dentro da imagem e tem de ser idêntico ao firmware.bin.
+          python - <<'PY'
+          a = open(".pio/build/esp32s3/sabia-wokwi.bin", "rb").read()
+          b = open(".pio/build/esp32s3/firmware.bin", "rb").read()
+          assert a[0x10000:0x10000 + len(b)] == b, "programa fora do lugar na imagem"
+          assert a[0x8000:0x8002] == b"\xaa\x50", "tabela de particoes ausente"
+          print("imagem ok:", len(a), "bytes")
+          PY
       - name: Guardar o firmware
         uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.env }}
-          path: firmware/.pio/build/${{ matrix.env }}/firmware.bin
+          path: |
+            firmware/.pio/build/${{ matrix.env }}/firmware.bin
+            firmware/.pio/build/${{ matrix.env }}/sabia-wokwi.bin
+          if-no-files-found: error
           retention-days: 14
