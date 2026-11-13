@@ -1,6 +1,7 @@
 [wokwi]
 version = 1
-firmware = '.pio/build/esp32s3/firmware.bin'
+# Imagem completa (bootloader + partições + programa), gerada por imagem_wokwi.py
+firmware = '.pio/build/esp32s3/sabia-wokwi.bin'
 elf = '.pio/build/esp32s3/firmware.elf'
 
 # Página web no simulador: com a simulação rodando, abra http://localhost:8180

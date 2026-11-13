@@ -400,8 +400,8 @@ static void tratarEstado() {
     DadosTela d = lerDados();
     doc["versao"] = SABIA_VERSAO;
     if (d.temHora) {
-      char hora[32];
-      int fuso = ajustes.fusoMin < 0 ? -ajustes.fusoMin : ajustes.fusoMin;
+      char hora[48];  // folga para o compilador não reclamar de texto cortado
+      int fuso = (ajustes.fusoMin < 0 ? -ajustes.fusoMin : ajustes.fusoMin) % 1440;
       snprintf(hora, sizeof(hora), "%04u-%02u-%02uT%02u:%02u:%02u%c%02d:%02d", d.agora.ano, d.agora.mes, d.agora.dia, d.hora, d.minuto,
                d.segundo, ajustes.fusoMin < 0 ? '-' : '+', fuso / 60, fuso % 60);
       doc["hora"] = hora;
