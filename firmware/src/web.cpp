@@ -22,6 +22,7 @@
 #include <esp_system.h>
 #include <esp_timer.h>
 #include <math.h>
+#include <time.h>
 #include <mbedtls/md.h>
 #if __has_include(<esp_random.h>)
 #include <esp_random.h>
@@ -51,7 +52,6 @@
 
 namespace sabia {
 
-static const char* const FUSO = "-03:00";  // horário de Brasília; o relógio guarda a hora local
 static const char* const TIPO_JSON = "application/json";
 static const char* const TIPO_TEXTO = "text/plain; charset=utf-8";
 
@@ -65,6 +65,8 @@ static bool apLigado = false, apSempre = false, temWifiDaCasa = false;
 static bool estavaConectado = false;
 static uint32_t semConexaoDesdeMs = 0, conectadoDesdeMs = 0, ultimaTentativaMs = 0;
 static String nomeWifi, nomeAp;
+static uint32_t ultimoNtpMs = 0;  // relógio pela internet (ver acertarPelaInternet)
+static bool ntpFeito = false;
 
 static void ligarAp() {
   if (apLigado) return;
@@ -142,6 +144,7 @@ static void redeTick() {
   bool conectado = WiFi.status() == WL_CONNECTED;
   if (conectado && !estavaConectado) {
     conectadoDesdeMs = millis();
+    ultimoNtpMs = 0;  // acabou de conectar: confere o relógio logo
     MDNS.end();
     if (MDNS.begin("sabia")) MDNS.addService("http", "tcp", 80);
     Serial.printf("\r\nWi-Fi \"%s\" conectado. Pagina: http://%s ou http://sabia.local\r\n", nomeWifi.c_str(),
@@ -175,6 +178,54 @@ void webMostrarRede(Print& saida) {
     saida.print("Wi-Fi da casa nao configurado (use: wifi NOME SENHA)\r\n");
   }
   if (apLigado) saida.printf("Rede propria \"%s\" ligada. Pagina: http://%s\r\n", nomeAp.c_str(), WiFi.softAPIP().toString().c_str());
+}
+
+// ---------------------------------------------------------------------------
+// Relógio pela internet (NTP). O relógio (RTC) guarda a hora local; quando o
+// Wi-Fi da casa está conectado, ele é conferido na conexão e uma vez por dia,
+// e acertado se estiver errado por 2 s ou mais. Sem internet, vale o RTC.
+// ---------------------------------------------------------------------------
+static void acertarPelaInternet() {
+  int16_t fuso;
+  {
+    Trava t;
+    if (!ajustes.ntp || !temRelogio()) return;
+    fuso = ajustes.fusoMin;
+  }
+  ultimoNtpMs = millis();
+  configTime(static_cast<long>(fuso) * 60L, 0, "a.st1.ntp.br", "pool.ntp.org");
+  struct tm agora;
+  if (!getLocalTime(&agora, 8000) || agora.tm_year + 1900 < 2024) {
+    Serial.print("\r\nRelogio: sem resposta do servidor de hora\r\n");
+    return;
+  }
+  ntpFeito = true;
+  Momento rede;
+  rede.ano = static_cast<uint16_t>(agora.tm_year + 1900);
+  rede.mes = static_cast<uint8_t>(agora.tm_mon + 1);
+  rede.dia = static_cast<uint8_t>(agora.tm_mday);
+  rede.hora = static_cast<uint8_t>(agora.tm_hour);
+  rede.minuto = static_cast<uint8_t>(agora.tm_min);
+  Trava t;
+  DadosTela d = lerDados();
+  int64_t segRede = static_cast<int64_t>(minutoAbsoluto(rede)) * 60 + agora.tm_sec;
+  int64_t segRtc = d.temHora ? static_cast<int64_t>(minutoAbsoluto(d.agora)) * 60 + d.segundo : 0;
+  int64_t diferenca = segRede - segRtc;
+  if (diferenca < 0) diferenca = -diferenca;
+  if (diferenca < 2) return;
+  acertarRelogio(rede.ano, rede.mes, rede.dia, rede.hora, rede.minuto, static_cast<uint8_t>(agora.tm_sec));
+  char texto[TAMANHO_EVENTO];
+  if (diferenca < 3600) snprintf(texto, sizeof(texto), "Relogio acertado pela internet (%lld s)", static_cast<long long>(diferenca));
+  else snprintf(texto, sizeof(texto), "Relogio acertado pela internet");
+  registrarEvento(texto);
+  Serial.printf("\r\n%s\r\n", texto);
+}
+
+static void ntpTick() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  uint32_t intervalo = ntpFeito ? 24UL * 3600000UL : 10UL * 60000UL;  // sem sucesso, tenta a cada 10 min
+  if (ultimoNtpMs != 0 && millis() - ultimoNtpMs < intervalo) return;
+  acertarPelaInternet();
 }
 
 // ---------------------------------------------------------------------------
@@ -350,8 +401,9 @@ static void tratarEstado() {
     doc["versao"] = SABIA_VERSAO;
     if (d.temHora) {
       char hora[32];
-      snprintf(hora, sizeof(hora), "%04u-%02u-%02uT%02u:%02u:%02u%s", d.agora.ano, d.agora.mes, d.agora.dia, d.hora, d.minuto,
-               d.segundo, FUSO);
+      int fuso = ajustes.fusoMin < 0 ? -ajustes.fusoMin : ajustes.fusoMin;
+      snprintf(hora, sizeof(hora), "%04u-%02u-%02uT%02u:%02u:%02u%c%02d:%02d", d.agora.ano, d.agora.mes, d.agora.dia, d.hora, d.minuto,
+               d.segundo, ajustes.fusoMin < 0 ? '-' : '+', fuso / 60, fuso % 60);
       doc["hora"] = hora;
     } else {
       doc["hora"] = static_cast<const char*>(nullptr);
@@ -686,6 +738,7 @@ static void tarefaWeb(void*) {
   for (;;) {
     servidor.handleClient();
     redeTick();
+    ntpTick();
     driveTick();
     delay(2);
   }

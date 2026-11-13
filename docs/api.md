@@ -56,7 +56,7 @@ Se `/api/estado` não responder, a página entra em **modo demonstração** e si
 }
 ```
 
-- `hora` é a hora local do relógio (RTC), sempre com `-03:00`; vem `null` se o relógio não responder.
+- `hora` é a hora local do relógio (RTC), com o deslocamento do fuso escolhido (`-03:00` em Brasília); vem `null` se o relógio não responder.
 - `atual` é `null` quando nada está regando. `origem` ainda não é enviado pelo firmware.
 - `fase` segue o `Controlador`: `abrindo`, `regando`, `trocando`, `fechando` ou `pausa`. Em `trocando`, a válvula do próximo setor já abriu e a bomba continua ligada.
 - `origem` pode ser `programa A`, `programa B`, `programa C`, `ciclo`, `manual` ou `retomada`.
@@ -137,7 +137,10 @@ Regras:
 - `retomada`: ver `docs/decisoes/2026-11-13-retomada-apos-queda-de-energia.md`.
 - **Senhas nunca saem do ESP.** No `GET`, `rede.wifiSenha` e `rede.apSenha` voltam vazias. No `PUT`, uma senha vazia significa "manter a atual".
 - Para trocar a senha da página, o `PUT` traz `seguranca.novaSenha`. Esse campo não é guardado como texto e não volta no `GET`.
-- O firmware guarda o documento inteiro. Ainda não aplica: `janela` dos setores, `tipo`, `relogio` (NTP e fuso) e `display`. Um setor com `ativo: false` não rega por nenhum caminho (agenda, página, encoder ou serial).
+- O firmware guarda o documento inteiro e aplica tudo, menos o `tipo` do setor, que é só informativo.
+- `janela` vale para as regas da agenda: o setor só começa dentro dela (o controlador soma o tempo dos setores antes dele para saber a hora). Ligar na mão não respeita a janela.
+- `relogio.ntp`: com o Wi-Fi da casa conectado, o relógio é conferido pela internet ao conectar e uma vez por dia. `relogio.fuso` também define o deslocamento do campo `hora` do estado.
+- `display.luzSegundos` apaga o conteúdo da tela (0 = nunca); `display.travarComandos` deixa a tela só mostrando o estado. Um setor com `ativo: false` não rega por nenhum caminho (agenda, página, encoder ou serial).
 - Trocar algo em `rede` faz o controlador reconectar logo depois de responder.
 - O firmware valida tudo de novo (faixas, `duracaoMin` e os `minutos` dos programas ≤ `tempoMaxMin`, senha do AP com 8 caracteres ou mais) e responde `400` com o motivo se algo estiver errado. A validação da página serve só para ajudar quem está digitando.
 

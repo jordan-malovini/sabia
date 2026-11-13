@@ -405,12 +405,47 @@ void interfaceIniciar() {
   inicioMs = millis();
 }
 
+static uint16_t apagarDepoisS = 60;
+static bool comandosTravados = false, apagada = false;
+
+void interfaceOpcoes(uint16_t apagarS, bool travarComandos) {
+  apagarDepoisS = apagarS;
+  comandosTravados = travarComandos;
+}
+
 bool interfaceAtualizar(Controlador& c, Agenda& agenda, Retomada& retomada, const DadosTela& d, uint32_t agoraMs) {
   bool agendaMudou = false;
   int32_t passos = lerPassos();
   Clique clique = lerBotao(agoraMs);
+  bool mexeu = passos != 0 || clique != Clique::Nenhum;
+
+  // Tela apagada: o primeiro toque só acende, sem executar nada.
+  if (apagada) {
+    if (!mexeu && !retomada.aguardando()) return false;
+    tela.setPowerSave(0);
+    apagada = false;
+    ultimaAcaoMs = agoraMs;
+    redesenhar = true;
+    passos = 0;
+    clique = Clique::Nenhum;
+  } else if (apagarDepoisS > 0 && !retomada.aguardando() && telaAtual != Tela::Boot &&
+             agoraMs - ultimaAcaoMs > static_cast<uint32_t>(apagarDepoisS) * 1000UL) {
+    tela.setPowerSave(1);
+    apagada = true;
+    telaAtual = Tela::Estado;
+    return false;
+  }
+
+  // Comandos travados pela página: a tela só mostra o estado.
+  if (comandosTravados && telaAtual != Tela::Boot) {
+    if (telaAtual != Tela::Estado) { telaAtual = Tela::Estado; redesenhar = true; }
+    if (clique != Clique::Nenhum) avisar("Comandos so pela pagina", agoraMs);
+    passos = 0;
+    clique = Clique::Nenhum;
+  }
+
   bool curto = clique == Clique::Curto, longo = clique == Clique::Longo;
-  if (passos != 0 || clique != Clique::Nenhum) { ultimaAcaoMs = agoraMs; redesenhar = true; }
+  if (mexeu) { ultimaAcaoMs = agoraMs; redesenhar = true; }
   Programa& p = agenda.programa(progSel);
 
   switch (telaAtual) {

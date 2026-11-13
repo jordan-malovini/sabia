@@ -23,6 +23,9 @@ struct DadosTela {
 };
 
 void interfaceIniciar();
+// Ajustes da página: apagar a tela depois de `apagarS` sem uso (0 = nunca) e
+// travar os comandos (a tela só mostra; ligar e parar ficam só pela página).
+void interfaceOpcoes(uint16_t apagarS, bool travarComandos);
 // Retorna true quando a agenda foi alterada pelo menu e precisa ser salva.
 bool interfaceAtualizar(Controlador& controlador, Agenda& agenda, Retomada& retomada, const DadosTela& dados,
                         uint32_t agoraMs);

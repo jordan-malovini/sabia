@@ -53,6 +53,11 @@ bool diaPermitido(const Programa& p, uint32_t dias) {
   return false;
 }
 
+bool dentroDaJanela(uint16_t m, uint16_t inicio, uint16_t fim) {
+  if (inicio <= fim) return m >= inicio && m <= fim;
+  return m >= inicio || m <= fim;
+}
+
 uint32_t Agenda::duracaoSetorS(const Programa& p, uint8_t setor) const {
   uint32_t minutos = p.minutosSetor[setor];
   if (minutos > MINUTOS_MAX_SETOR) minutos = MINUTOS_MAX_SETOR;
@@ -109,10 +114,11 @@ void Agenda::liberarPendente() {
   for (uint8_t k = 1; k < nPendentes_; k++) pendentes_[k - 1] = pendentes_[k];
   nPendentes_--;
   const Programa& p = programas_[i];
+  uint32_t depoisS = 0;
   for (uint8_t s = 0; s < NUM_SETORES; s++) {
     uint32_t duracao = duracaoSetorS(p, s);
-    if (duracao > 0 && !manual && decisor_ != nullptr) duracao = decisor_->duracao(s + 1, duracao);
-    if (duracao > 0) controlador_.pedir(s + 1, duracao);
+    if (duracao > 0 && !manual && decisor_ != nullptr) duracao = decisor_->duracao(s + 1, duracao, depoisS);
+    if (duracao > 0 && controlador_.pedir(s + 1, duracao) == Resultado::Aceito) depoisS += duracao;
   }
 }
 
