@@ -67,9 +67,11 @@ static void gravarNoDia(const char* linha) {
 }
 
 static void medirUso() {
-  if (arquivos == nullptr) return;
-  uint64_t total = noCartao ? SD.totalBytes() : LittleFS.totalBytes();
-  uint64_t usado = noCartao ? SD.usedBytes() : LittleFS.usedBytes();
+  // No cartão a conta do espaço usado varre a tabela inteira e pode levar vários
+  // segundos, mais que o watchdog tolera. Só a memória interna é medida.
+  if (arquivos == nullptr || noCartao) return;
+  uint64_t total = LittleFS.totalBytes();
+  uint64_t usado = LittleFS.usedBytes();
   usoPct = total == 0 ? -1 : static_cast<int>(usado * 100 / total);
 }
 

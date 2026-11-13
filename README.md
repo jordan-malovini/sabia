@@ -88,7 +88,7 @@ O BME280 e o VEML7700 não existem no Wokwi e ficam para a bancada.
 
 **Registro e histórico:** chuva, clima, regas e eventos são gravados num arquivo por dia, no cartão microSD ou, sem cartão, na memória do ESP. A página mostra hoje, 7 e 30 dias e baixa em CSV. Para mandar ao Google Drive, veja [docs/drive.md](docs/drive.md).
 
-**Balanço hídrico:** nas regas automáticas, o SABIÁ encurta ou pula a rega de um setor que ainda tem água, e nunca rega mais que o tempo do programa. Antes de confiar nele, informe a latitude e meça a taxa de aplicação de cada setor. Detalhes em [docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md](docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md).
+**Balanço hídrico:** nas regas automáticas, o SABIÁ encurta ou pula a rega de um setor que ainda tem água, e nunca rega mais que o tempo do programa. Ele vem desligado de fábrica: antes de ligar, informe a latitude e meça a taxa de aplicação de cada setor. Detalhes em [docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md](docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md).
 
 Testes da página (Node 22 e Google Chrome): `node tests/pagina/teste-pagina.mjs` (modo demonstração) e `node tests/pagina/teste-api.mjs` (contra um controlador simulado).
 

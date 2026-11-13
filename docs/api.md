@@ -64,7 +64,7 @@ Se `/api/estado` não responder, a página entra em **modo demonstração** e si
 - `pausaChuvaDias` é quantos dias faltam na pausa por chuva (0 = sem pausa).
 - `retomada` deixa de ser `null` enquanto o controlador espera para retomar uma rega depois de uma queda de energia: `{ "faltamS": 540, "setor": 3, "setores": 2, "semEnergiaMin": 4 }`.
 - `setores` tem sempre 8 itens. `saldoPct` é a água no solo em relação a `estacao.capacidadeSoloMm`. Sem `proxima`, a página calcula a próxima rega de cada setor pela agenda.
-- `sistema.cartaoSd.naFlash` é `true` quando não há cartão e o registro vai para a memória interna do ESP. `ok` fica `false` se uma gravação falhar.
+- `sistema.cartaoSd.naFlash` é `true` quando não há cartão e o registro vai para a memória interna do ESP. `ok` fica `false` se uma gravação falhar. `usoPct` só é medido na memória interna; com cartão vem `null`.
 - `sistema.drive.ultimoEnvio` é o último dia confirmado pelo Drive; `erro` traz o motivo da última falha.
 - `adiandoPorChuva`: choveu mais que `chuvaAdiarMm` em 24 h e os inícios automáticos estão sendo pulados. `balancoAtivo`: o balanço hídrico está ajustando os tempos (ver `docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md`).
 - `clima.et0HojeMm` é uma estimativa com a máxima e a mínima até agora. `saldoPct` fica `null` até o balanço fechar um dia com temperatura e latitude. `adiadoAte` ainda não é enviado.

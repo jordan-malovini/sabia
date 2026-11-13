@@ -160,7 +160,7 @@ const char* programaDeJson(JsonVariantConst e, Programa& p) {
 // ---------------------------------------------------------------------------
 void configPadrao(JsonDocument& doc) {
   doc.clear();
-  doc["balancoHidrico"] = true;
+  doc["balancoHidrico"] = false;  // só depois de informar a latitude e medir a taxa de cada setor
   doc["adiarPorChuva"] = true;
   doc["chuvaAdiarMm"] = 5;
 

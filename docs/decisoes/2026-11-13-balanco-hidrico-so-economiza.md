@@ -46,7 +46,7 @@ A radiação Ra foi conferida com o exemplo 8 da FAO-56 (20° sul, 3 de setembro
 2. Medir a **taxa de aplicação** de cada setor (copos na aspersão, vazão dos gotejadores no gotejo).
 3. Acompanhar o solo por algumas semanas e ajustar o Kc ou o fator de cada setor.
 
-Até lá, dá para deixar o balanço desligado nos ajustes: o saldo continua sendo calculado e aparece no painel, sem interferir nas regas.
+Por isso o balanço **vem desligado de fábrica** ("Ajustar o tempo pelo balanço hídrico", em Ajustes → Ajuste pelo clima). Desligado, o saldo continua sendo calculado e aparece no painel, sem interferir nas regas. O adiamento por chuva vem ligado.
 
 ## Ainda não feito
 
