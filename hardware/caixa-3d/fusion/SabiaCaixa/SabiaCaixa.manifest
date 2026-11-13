@@ -1,0 +1,10 @@
+{
+  "autodeskProduct": "Fusion",
+  "type": "script",
+  "author": "SABIA",
+  "description": {
+    "": "Desenha a caixa do controlador SABIÁ (base, tampa e componentes) com as medidas da Rev A."
+  },
+  "supportedOS": "windows|mac",
+  "editEnabled": true
+}

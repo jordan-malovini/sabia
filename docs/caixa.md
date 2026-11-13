@@ -38,6 +38,36 @@ A prévia (F5) mostra cores e transparência. A renderização (F6) só serve pa
 
 As divisórias têm 49,5 mm de altura: ficam acima da fonte (40 mm) e abaixo da tela (13,5 mm de profundidade), por isso a tela pode ficar centralizada.
 
+## Editar no Fusion
+
+O script `hardware/caixa-3d/fusion/SabiaCaixa` desenha a mesma caixa no Fusion, como um projeto nativo: cada parte vira um esboço e uma extrusão com nome na linha do tempo.
+
+**Rodar (uma vez):**
+
+1. Baixe a pasta `SabiaCaixa` inteira (com os dois arquivos, `.py` e `.manifest`).
+2. No Fusion: **Utilitários → Suplementos → Scripts e suplementos** (ou `Shift+S`).
+3. Clique em **+** → **Script ou suplemento do dispositivo** e escolha a pasta `SabiaCaixa`.
+4. Selecione **SabiaCaixa** na lista e clique em **Executar**. Em alguns segundos abre um projeto novo com a caixa.
+
+**O que aparece:**
+
+- Componente **Base**: caixa, divisórias da fonte, suportes, paredinha do microSD, abas de parede, dobradiça e todos os furos.
+- Componente **Tampa**: placa, aba de encaixe, janela e suportes da tela, encoder, dobradiça e furos de fechamento.
+- Componente **Componentes (só para conferir)**: blocos do tamanho de cada módulo. Não vão para a impressão.
+- Para ver por dentro, esconda a Tampa no navegador (o ícone de olho, à esquerda).
+
+**Editar:**
+
+- **Mudar uma altura ou profundidade:** clique duas vezes na extrusão na linha do tempo e troque o número.
+- **Mover um furo ou um suporte:** clique duas vezes no esboço dele (por exemplo, "Suportes ESP") e arraste ou ponha uma cota.
+- **Muitas medidas de uma vez** (como os furos reais das placas): mude no começo do `SabiaCaixa.py` e rode de novo. Ele cria outro projeto; o anterior não é alterado.
+
+**Diferenças do modelo OpenSCAD:** os furos de fechamento e os da fonte saem retos, sem escareado (dá para fazer com o recurso **Furo** do Fusion), e a janela da tela sai sem o chanfro de fora. A dobradiça é desenhada como um polígono de muitos lados.
+
+**Imprimir:** botão direito no corpo **Base** (e depois na **Tampa**) → **Salvar como malha** → 3MF ou STL. A tampa se imprime com a face de fora na mesa, então vire a peça no fatiador.
+
+O script não foi testado num Fusion de verdade, só num simulado. Se ele parar, a mensagem diz em qual etapa parou: mande um print dela.
+
 ## O que medir antes de imprimir
 
 Os itens marcados **MEDIR** no `caixa.scad` são estimativas. Com um paquímetro, confira:
