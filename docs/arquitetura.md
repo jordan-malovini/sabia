@@ -55,7 +55,7 @@ flowchart LR
 
 1. O controle nunca depende da rede.
 2. Um setor regando por vez. Duas válvulas só ficam abertas juntas durante os 2 s da troca entre setores.
-3. Na dúvida, desligado. No boot, o nível de desligado é escrito em cada pino antes de ele virar saída (a placa de relés costuma ser ativa em nível baixo). Depois de uma queda de energia, nenhuma rega é retomada. Se o firmware travar, o watchdog reinicia o ESP com tudo desligado.
+3. Na dúvida, desligado. No boot, o nível de desligado é escrito em cada pino antes de ele virar saída (a placa de relés costuma ser ativa em nível baixo). Depois de uma queda de energia, tudo fica desligado por 10 min antes de a rega ser retomada, e ela não é retomada se a energia ficou fora por mais de 2 h. Se o firmware travar, o watchdog reinicia o ESP com tudo desligado.
 
 ## Lógica de irrigação
 

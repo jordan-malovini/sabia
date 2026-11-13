@@ -29,7 +29,7 @@
 | RF10 | Servir página web local com painel, destaque do setor regando, fila, histórico em gráficos e download em CSV. |
 | RF11 | Registrar dados na flash e no cartão SD, e enviá-los ao Google Drive, apagando do cartão só depois da confirmação. |
 | RF12 | Continuar irrigando pela agenda se faltar rede, e criar o próprio Wi-Fi (modo AP) como acesso alternativo. |
-| RF13 | Aplicar limites de segurança: tempo máximo por setor, janela de horário e nenhuma rega retomada após queda de energia. |
+| RF13 | Aplicar limites de segurança: tempo máximo por setor e janela de horário. Depois de uma queda de energia, esperar 10 min com tudo desligado e então retomar a rega de onde parou, com opção de retomar na hora ou cancelar. Se a energia ficar fora por mais de 2 h, não retomar. |
 | RF14 | Manter todas as saídas desligadas desde o boot: o nível de desligado é escrito antes de o pino virar saída. |
 | RF15 | Usar o watchdog do ESP32 para reiniciar o sistema, com todas as saídas desligadas, se o firmware travar. |
 | RF16 | Proteger os comandos: senha no Wi-Fi próprio (AP) e autenticação na página para ligar, parar e alterar ajustes. |

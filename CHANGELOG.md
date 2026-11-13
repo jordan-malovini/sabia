@@ -24,6 +24,8 @@ Formato: uma seção por versão, da mais nova para a mais antiga.
 - Troca entre setores com sobreposição de 2 s e a bomba ligada do começo ao fim da fila (ideia do controlador antigo), em vez de desligar a bomba a cada setor.
 - Agenda de regas com 3 programas (A, B, C): até 4 horários de início, dias da semana, ímpares, pares ou a cada N dias, tempo por setor e ajuste de 5 a 200 %. Empilhamento de programas, pausa por chuva de até 14 dias, próxima rega na tela e gravação na memória do ESP. Modelo baseado em controladores Rain Bird e Hunter.
 - 14 testes da agenda, incluindo o defeito do controlador antigo (regar todos os dias no mesmo horário).
+- Retomada depois de queda de energia: o setor atual, o tempo que falta e a fila são gravados; ao voltar, espera 10 min e retoma, com opção de retomar na hora ou cancelar, e descarta se a energia ficou fora por mais de 2 h.
+- Edição da agenda pelo encoder ("Programar agenda"): ligar o programa, horários de início, dias (semana, ímpares, pares, intervalo), tempo de cada setor e ajuste.
 - Nome do projeto: SABIÁ (Sistema Automático de Balanço e Irrigação Agrícola).
 - Documentação dividida em README e `docs/` (requisitos, arquitetura, hardware e mapa de pinos).
 - Requisitos de segurança RF14 (saídas desligadas no boot), RF15 (watchdog) e RF16 (senha e autenticação na página web).
