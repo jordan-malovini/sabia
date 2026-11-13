@@ -17,8 +17,10 @@ void Controlador::iniciar() {
 
 Resultado Controlador::pedir(uint8_t setor, uint32_t duracaoS) {
   if (setor < 1 || setor > NUM_SETORES) return Resultado::SetorInvalido;
+  if (config_.setorDesativado[setor - 1]) return Resultado::SetorDesativado;
   if (duracaoS == 0) return Resultado::DuracaoInvalida;
-  if (duracaoS > config_.tempoMaximoS) duracaoS = config_.tempoMaximoS;
+  uint32_t maximo = config_.tempoMaximoSetorS[setor - 1] != 0 ? config_.tempoMaximoSetorS[setor - 1] : config_.tempoMaximoS;
+  if (duracaoS > maximo) duracaoS = maximo;
 
   // Um setor que já está regando (e não está sendo encerrado) não entra de novo.
   if (setor == atual_.setor && !encerrar_ && estado_ != Estado::Trocando) return Resultado::JaNaFila;

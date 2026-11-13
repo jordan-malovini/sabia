@@ -2,6 +2,7 @@
 firmware/include/secrets.h
 
 # Build do PlatformIO e do Arduino
+firmware/include/pagina_gz.h
 .pio/
 build/
 *.elf

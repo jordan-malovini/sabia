@@ -1,6 +1,11 @@
 // Modelo de credenciais do SABIÁ.
 // Copie este arquivo para "secrets.h" na mesma pasta e preencha os valores.
 // O secrets.h está no .gitignore e nunca deve ir para o repositório.
+//
+// É opcional: sem o secrets.h, o firmware usa a rede própria "SABIA" e a
+// senha "sabia1234" (rede e página), e tudo se troca depois pela página.
+// Com o secrets.h, estes valores valem até serem trocados pela página.
+// Hoje o firmware usa WIFI_SSID, WIFI_PASSWORD, AP_PASSWORD e WEB_PASSWORD.
 
 #pragma once
 

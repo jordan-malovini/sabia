@@ -1,0 +1,398 @@
+#include "ApiJson.h"
+
+#include <stdio.h>
+#include <string.h>
+
+namespace sabia {
+
+static const char* const MODOS[] = {"semana", "impares", "pares", "intervalo"};
+static char erro_[112];
+
+static bool inteiro(JsonVariantConst v, long minimo, long maximo, long& valor) {
+  if (!v.is<long>()) return false;
+  valor = v.as<long>();
+  return valor >= minimo && valor <= maximo;
+}
+
+static bool texto(JsonVariantConst v, size_t minimo, size_t maximo) {
+  if (!v.is<const char*>()) return false;
+  size_t n = strlen(v.as<const char*>());
+  return n >= minimo && n <= maximo;
+}
+
+static bool doisDigitos(const char* t, int& valor) {
+  if (t[0] < '0' || t[0] > '9' || t[1] < '0' || t[1] > '9') return false;
+  valor = (t[0] - '0') * 10 + (t[1] - '0');
+  return true;
+}
+
+bool horaDeTexto(const char* t, uint16_t& minutoDoDia) {
+  int h = 0, m = 0;
+  if (t == nullptr || strlen(t) != 5 || t[2] != ':') return false;
+  if (!doisDigitos(t, h) || !doisDigitos(t + 3, m) || h > 23 || m > 59) return false;
+  minutoDoDia = static_cast<uint16_t>(h * 60 + m);
+  return true;
+}
+
+void textoDeHora(uint16_t minutoDoDia, char saida[6]) {
+  snprintf(saida, 6, "%02u:%02u", static_cast<unsigned>(minutoDoDia / 60 % 24), static_cast<unsigned>(minutoDoDia % 60));
+}
+
+static bool bissexto(unsigned ano) { return (ano % 4 == 0 && ano % 100 != 0) || ano % 400 == 0; }
+static unsigned diasNoMes(unsigned ano, unsigned mes) {
+  static const uint8_t DIAS[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  return mes == 2 && bissexto(ano) ? 29 : DIAS[mes - 1];
+}
+
+bool diasDeData(const char* t, uint32_t& dias) {
+  if (t == nullptr || strlen(t) != 10 || t[4] != '-' || t[7] != '-') return false;
+  int seculo = 0, anoCurto = 0, mes = 0, dia = 0;
+  if (!doisDigitos(t, seculo) || !doisDigitos(t + 2, anoCurto) || !doisDigitos(t + 5, mes) || !doisDigitos(t + 8, dia)) return false;
+  unsigned ano = static_cast<unsigned>(seculo * 100 + anoCurto);
+  if (ano < 2000 || ano > 2099 || mes < 1 || mes > 12 || dia < 1 || static_cast<unsigned>(dia) > diasNoMes(ano, mes)) return false;
+  dias = diasDesde2000(static_cast<uint16_t>(ano), static_cast<uint8_t>(mes), static_cast<uint8_t>(dia));
+  return true;
+}
+
+void dataDeDias(uint32_t dias, char saida[11]) {
+  unsigned ano = 2000, mes = 1;
+  while (ano < 2099 && dias >= (bissexto(ano) ? 366u : 365u)) {
+    dias -= bissexto(ano) ? 366 : 365;
+    ano++;
+  }
+  while (mes < 12 && dias >= diasNoMes(ano, mes)) {
+    dias -= diasNoMes(ano, mes);
+    mes++;
+  }
+  unsigned dia = dias + 1 > 31 ? 31 : dias + 1;
+  snprintf(saida, 11, "%04u-%02u-%02u", ano, mes, dia);
+}
+
+// ---------------------------------------------------------------------------
+// Programas
+// ---------------------------------------------------------------------------
+void programaParaJson(const Programa& p, JsonObject o) {
+  o["ativo"] = p.ativo;
+  JsonArray inicios = o["inicios"].to<JsonArray>();
+  for (uint16_t ini : p.inicios) {
+    if (ini == SEM_HORARIO || ini >= 1440) {
+      inicios.add(static_cast<const char*>(nullptr));
+    } else {
+      char hora[6];
+      textoDeHora(ini, hora);
+      inicios.add(hora);
+    }
+  }
+  uint8_t modo = static_cast<uint8_t>(p.modo);
+  o["modo"] = MODOS[modo < 4 ? modo : 0];
+  JsonArray dias = o["dias"].to<JsonArray>();
+  for (uint8_t d = 0; d < 7; d++) dias.add((p.diasSemana >> d) & 1);
+  o["intervaloDias"] = p.intervaloDias < 1 ? 1 : p.intervaloDias;
+  if (p.modo == ModoDias::Intervalo) {
+    char data[11];
+    dataDeDias(p.diaReferencia, data);
+    o["inicioIntervalo"] = data;
+  } else {
+    o["inicioIntervalo"] = static_cast<const char*>(nullptr);
+  }
+  JsonArray minutos = o["minutos"].to<JsonArray>();
+  for (uint16_t m : p.minutosSetor) minutos.add(m);
+  o["ajustePct"] = p.ajustePct;
+}
+
+const char* programaDeJson(JsonVariantConst e, Programa& p) {
+  Programa t = p;
+  long n = 0;
+
+  if (!e["ativo"].is<bool>()) return "falta dizer se o programa está ligado";
+  t.ativo = e["ativo"].as<bool>();
+
+  JsonArrayConst inicios = e["inicios"].as<JsonArrayConst>();
+  if (inicios.size() != INICIOS_POR_PROGRAMA) return "os horários de início devem ser 4";
+  for (uint8_t k = 0; k < INICIOS_POR_PROGRAMA; k++) {
+    JsonVariantConst v = inicios[k];
+    if (v.isNull()) t.inicios[k] = SEM_HORARIO;
+    else if (!horaDeTexto(v.as<const char*>(), t.inicios[k])) return "horário de início inválido";
+  }
+
+  const char* modo = e["modo"].as<const char*>();
+  int indiceModo = -1;
+  for (int k = 0; k < 4; k++) if (modo != nullptr && strcmp(modo, MODOS[k]) == 0) indiceModo = k;
+  if (indiceModo < 0) return "modo de dias inválido";
+  t.modo = static_cast<ModoDias>(indiceModo);
+
+  JsonArrayConst dias = e["dias"].as<JsonArrayConst>();
+  if (dias.size() != 7) return "os dias da semana devem ser 7";
+  t.diasSemana = 0;
+  for (uint8_t d = 0; d < 7; d++) if (dias[d].as<bool>()) t.diasSemana |= static_cast<uint8_t>(1 << d);
+
+  if (!inteiro(e["intervaloDias"], 1, 30, n)) return "o intervalo deve ser de 1 a 30 dias";
+  t.intervaloDias = static_cast<uint8_t>(n);
+  JsonVariantConst inicioIntervalo = e["inicioIntervalo"];
+  if (!inicioIntervalo.isNull() && !diasDeData(inicioIntervalo.as<const char*>(), t.diaReferencia))
+    return "data de início do intervalo inválida";
+
+  JsonArrayConst minutos = e["minutos"].as<JsonArrayConst>();
+  if (minutos.size() != NUM_SETORES) return "os tempos devem ser 8, um por setor";
+  for (uint8_t s = 0; s < NUM_SETORES; s++) {
+    if (!inteiro(minutos[s], 0, MINUTOS_MAX_SETOR, n)) return "tempo de setor fora da faixa (0 a 180 min)";
+    t.minutosSetor[s] = static_cast<uint16_t>(n);
+  }
+
+  if (!inteiro(e["ajustePct"], AJUSTE_MIN, AJUSTE_MAX, n)) return "o ajuste deve ser de 5 a 200 %";
+  t.ajustePct = static_cast<uint8_t>(n);
+
+  p = t;
+  return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Configuração
+// ---------------------------------------------------------------------------
+void configPadrao(JsonDocument& doc) {
+  doc.clear();
+  doc["balancoHidrico"] = true;
+  doc["adiarPorChuva"] = true;
+  doc["chuvaAdiarMm"] = 5;
+
+  JsonObject retomada = doc["retomada"].to<JsonObject>();
+  retomada["ativa"] = true;
+  retomada["esperaMin"] = 10;
+  retomada["limiteMin"] = 120;
+
+  JsonObject bomba = doc["bomba"].to<JsonObject>();
+  bomba["usar"] = true;
+  bomba["atrasoLigarS"] = 2;
+  bomba["atrasoFecharS"] = 1;
+  bomba["sobreposicaoS"] = 2;
+  bomba["pausaEntreSetoresS"] = 3;
+
+  JsonArray setores = doc["setores"].to<JsonArray>();
+  for (uint8_t i = 1; i <= NUM_SETORES; i++) {
+    JsonObject s = setores.add<JsonObject>();
+    char nome[12];
+    snprintf(nome, sizeof(nome), "Setor %u", i);
+    s["nome"] = nome;
+    s["ativo"] = true;
+    s["tipo"] = "gotejo";
+    s["duracaoMin"] = 25;
+    s["kc"] = 1.0;
+    s["taxaMmH"] = 2.5;
+    s["eficienciaPct"] = 90;
+    s["deficitMinMm"] = 3;
+    s["tempoMaxMin"] = 60;
+    JsonArray janela = s["janela"].to<JsonArray>();
+    janela.add("00:00");
+    janela.add("23:59");
+    s["fator"] = 1.0;
+  }
+
+  JsonObject estacao = doc["estacao"].to<JsonObject>();
+  estacao["mmPorBasculada"] = 0.2;
+  estacao["chuvaEfetivaMinMm"] = 2;
+  estacao["capacidadeSoloMm"] = 40;
+  estacao["latitude"] = static_cast<const char*>(nullptr);
+  estacao["ajusteTempC"] = 0;
+
+  JsonObject relogio = doc["relogio"].to<JsonObject>();
+  relogio["ntp"] = false;
+  relogio["fuso"] = "America/Sao_Paulo";
+
+  JsonObject rede = doc["rede"].to<JsonObject>();
+  rede["wifiNome"] = "";
+  rede["wifiSenha"] = "";
+  rede["apNome"] = "SABIA";
+  rede["apSenha"] = "";
+  rede["apSempre"] = false;
+
+  JsonObject registro = doc["registro"].to<JsonObject>();
+  registro["drive"] = false;
+  registro["driveUrl"] = "";
+  registro["envioHoras"] = 24;
+  registro["diasNoCartao"] = 7;
+
+  JsonObject display = doc["display"].to<JsonObject>();
+  display["luzSegundos"] = 60;
+  display["travarComandos"] = false;
+
+  doc["seguranca"]["sessaoMin"] = 30;
+}
+
+void mesclar(JsonVariant destino, JsonVariantConst origem) {
+  if (!origem.is<JsonObjectConst>() || !destino.is<JsonObject>()) {
+    destino.set(origem);
+    return;
+  }
+  for (JsonPairConst par : origem.as<JsonObjectConst>()) {
+    JsonVariant alvo = destino[par.key()];  // sem vínculo se a chave ainda não existe
+    if (alvo.is<JsonObject>() && par.value().is<JsonObjectConst>()) mesclar(alvo, par.value());
+    else destino[par.key()].set(par.value());
+  }
+}
+
+static const char* erroSetor(unsigned setor, const char* motivo) {
+  snprintf(erro_, sizeof(erro_), "Setor %u: %s", setor, motivo);
+  return erro_;
+}
+
+const char* validarConfig(JsonVariantConst c) {
+  long n = 0;
+  long tempoMax[NUM_SETORES] = {};
+
+  JsonArrayConst setores = c["setores"].as<JsonArrayConst>();
+  if (setores.size() != NUM_SETORES) return "A configuração deve ter 8 setores";
+  for (uint8_t i = 0; i < NUM_SETORES; i++) {
+    JsonVariantConst s = setores[i];
+    long duracao = 0;
+    if (!texto(s["nome"], 1, 60)) return erroSetor(i + 1, "nome vazio ou longo demais");
+    if (!s["ativo"].is<bool>()) return erroSetor(i + 1, "falta dizer se está ativo");
+    if (!inteiro(s["tempoMaxMin"], 1, 240, tempoMax[i])) return erroSetor(i + 1, "tempo máximo fora da faixa (1 a 240 min)");
+    if (!inteiro(s["duracaoMin"], 1, 240, duracao)) return erroSetor(i + 1, "duração fora da faixa (1 a 240 min)");
+    if (duracao > tempoMax[i]) return erroSetor(i + 1, "a duração passa do tempo máximo");
+  }
+
+  JsonArrayConst programas = c["programas"].as<JsonArrayConst>();
+  if (programas.size() != NUM_PROGRAMAS) return "A configuração deve ter 3 programas";
+  for (uint8_t i = 0; i < NUM_PROGRAMAS; i++) {
+    Programa p;
+    const char* motivo = programaDeJson(programas[i], p);
+    if (motivo != nullptr) {
+      snprintf(erro_, sizeof(erro_), "Programa %c: %s", 'A' + i, motivo);
+      return erro_;
+    }
+    for (uint8_t s = 0; s < NUM_SETORES; s++) {
+      if (p.minutosSetor[s] > tempoMax[s]) {
+        snprintf(erro_, sizeof(erro_), "Programa %c: o setor %u passa do tempo máximo dele (%ld min)", 'A' + i, s + 1, tempoMax[s]);
+        return erro_;
+      }
+    }
+  }
+
+  JsonVariantConst bomba = c["bomba"];
+  if (!bomba["usar"].is<bool>()) return "Bomba: falta dizer se ela é usada";
+  if (!inteiro(bomba["atrasoLigarS"], 0, 30, n)) return "Bomba: atraso para ligar fora da faixa (0 a 30 s)";
+  if (!inteiro(bomba["atrasoFecharS"], 0, 30, n)) return "Bomba: atraso para fechar fora da faixa (0 a 30 s)";
+  if (!inteiro(bomba["sobreposicaoS"], 0, 30, n)) return "Bomba: sobreposição fora da faixa (0 a 30 s)";
+  if (!inteiro(bomba["pausaEntreSetoresS"], 0, 120, n)) return "Bomba: pausa fora da faixa (0 a 120 s)";
+
+  JsonVariantConst retomada = c["retomada"];
+  if (!retomada["ativa"].is<bool>()) return "Queda de energia: falta dizer se a retomada está ligada";
+  if (!inteiro(retomada["esperaMin"], 1, 60, n)) return "Queda de energia: espera fora da faixa (1 a 60 min)";
+  if (!inteiro(retomada["limiteMin"], 10, 720, n)) return "Queda de energia: limite fora da faixa (10 a 720 min)";
+
+  JsonVariantConst rede = c["rede"];
+  if (!texto(rede["wifiNome"], 0, 32)) return "Rede: nome do Wi-Fi longo demais";
+  if (!texto(rede["wifiSenha"], 0, 63)) return "Rede: senha do Wi-Fi longa demais";
+  if (!texto(rede["apNome"], 1, 32)) return "Rede: o nome da rede própria deve ter de 1 a 32 caracteres";
+  if (!texto(rede["apSenha"], 0, 63) || (strlen(rede["apSenha"].as<const char*>()) > 0 && strlen(rede["apSenha"].as<const char*>()) < 8))
+    return "Rede: a senha da rede própria deve ter de 8 a 63 caracteres";
+  if (!rede["apSempre"].is<bool>()) return "Rede: falta dizer se a rede própria fica sempre ligada";
+
+  JsonVariantConst mm = c["estacao"]["mmPorBasculada"];
+  if (!mm.is<float>() || mm.as<float>() < 0.01f || mm.as<float>() > 2.0f) return "Estação: chuva por basculada fora da faixa (0,01 a 2 mm)";
+
+  JsonVariantConst seguranca = c["seguranca"];
+  if (!inteiro(seguranca["sessaoMin"], 5, 1440, n)) return "Segurança: tempo de sessão fora da faixa (5 a 1440 min)";
+  if (!seguranca["novaSenha"].isNull() && !texto(seguranca["novaSenha"], SENHA_MIN, SENHA_MAX))
+    return "Segurança: a nova senha deve ter de 6 a 64 caracteres";
+
+  return nullptr;
+}
+
+void lerAjustes(JsonVariantConst c, Ajustes& a) {
+  a = Ajustes();
+  JsonVariantConst bomba = c["bomba"];
+  a.usarBomba = bomba["usar"] | true;
+  a.controlador.atrasoBombaMs = (bomba["atrasoLigarS"] | 2UL) * 1000UL;
+  a.controlador.atrasoFechamentoMs = (bomba["atrasoFecharS"] | 1UL) * 1000UL;
+  a.controlador.sobreposicaoMs = (bomba["sobreposicaoS"] | 2UL) * 1000UL;
+  a.controlador.pausaEntreSetoresMs = (bomba["pausaEntreSetoresS"] | 3UL) * 1000UL;
+
+  uint32_t maior = 0;
+  JsonArrayConst setores = c["setores"].as<JsonArrayConst>();
+  for (uint8_t i = 0; i < NUM_SETORES; i++) {
+    JsonVariantConst s = setores[i];
+    uint32_t maxMin = s["tempoMaxMin"] | 60UL;
+    if (maxMin < 1) maxMin = 1;
+    if (maxMin > 240) maxMin = 240;
+    uint32_t duracao = s["duracaoMin"] | 25UL;
+    if (duracao < 1) duracao = 1;
+    if (duracao > maxMin) duracao = maxMin;
+    a.controlador.tempoMaximoSetorS[i] = maxMin * 60UL;
+    a.controlador.setorDesativado[i] = !(s["ativo"] | true);
+    a.duracaoPadraoMin[i] = static_cast<uint16_t>(duracao);
+    if (maxMin * 60UL > maior) maior = maxMin * 60UL;
+  }
+  a.controlador.tempoMaximoS = maior;
+
+  JsonVariantConst retomada = c["retomada"];
+  a.retomada.ativa = retomada["ativa"] | true;
+  a.retomada.esperaS = (retomada["esperaMin"] | 10UL) * 60UL;
+  a.retomada.limiteMin = retomada["limiteMin"] | 120UL;
+
+  a.sessaoMin = c["seguranca"]["sessaoMin"] | 30;
+  a.mmPorBasculada = c["estacao"]["mmPorBasculada"] | 0.2f;
+  if (a.mmPorBasculada < 0.01f || a.mmPorBasculada > 2.0f) a.mmPorBasculada = 0.2f;
+}
+
+// ---------------------------------------------------------------------------
+// Estado
+// ---------------------------------------------------------------------------
+static const char* nomeFase(Estado e) {
+  switch (e) {
+    case Estado::AbrindoValvula: return "abrindo";
+    case Estado::Regando: return "regando";
+    case Estado::Trocando: return "trocando";
+    case Estado::FechandoValvula: return "fechando";
+    case Estado::Pausa: return "pausa";
+    case Estado::Ocioso: break;
+  }
+  return "parado";
+}
+
+void regaParaJson(JsonObject o, const Controlador& c, const Agenda& a, bool temHora, const Momento& agora) {
+  if (c.setorAtivo() != 0) {
+    JsonObject atual = o["atual"].to<JsonObject>();
+    atual["setor"] = c.setorAtivo();
+    atual["fase"] = nomeFase(c.estado());
+    atual["restanteS"] = c.restanteS();
+    atual["duracaoS"] = c.duracaoAtualS();
+    atual["bomba"] = c.estado() == Estado::Regando || c.estado() == Estado::Trocando;
+  } else {
+    o["atual"] = static_cast<const char*>(nullptr);
+  }
+
+  JsonArray fila = o["fila"].to<JsonArray>();
+  if (c.proximoSetor() != 0) {  // durante a troca, o próximo já saiu da fila
+    JsonObject item = fila.add<JsonObject>();
+    item["setor"] = c.proximoPedido().setor;
+    item["duracaoS"] = c.proximoPedido().duracaoS;
+  }
+  for (size_t i = 0; i < c.tamanhoFila(); i++) {
+    JsonObject item = fila.add<JsonObject>();
+    item["setor"] = c.itemFila(i).setor;
+    item["duracaoS"] = c.itemFila(i).duracaoS;
+  }
+
+  uint8_t programa = 0;
+  uint16_t minutoDoDia = 0;
+  uint32_t faltam = 0;
+  if (temHora && a.proximoInicio(agora, programa, minutoDoDia, faltam)) {
+    JsonObject proxima = o["proximaRega"].to<JsonObject>();
+    char letra[2] = {static_cast<char>('A' + programa), 0};
+    char hora[6];
+    textoDeHora(minutoDoDia, hora);
+    proxima["programa"] = letra;
+    proxima["hora"] = hora;
+    static const char* const DIAS[7] = {"dom", "seg", "ter", "qua", "qui", "sex", "sáb"};
+    uint32_t hoje = diasDesde2000(agora.ano, agora.mes, agora.dia);
+    uint32_t dia = (minutoAbsoluto(agora) + faltam) / 1440UL;
+    proxima["quando"] = dia == hoje ? "hoje" : dia == hoje + 1 ? "amanhã" : DIAS[diaDaSemana(dia)];
+    proxima["faltamMin"] = faltam;
+  } else {
+    o["proximaRega"] = static_cast<const char*>(nullptr);
+  }
+  o["pausaChuvaDias"] = temHora ? a.diasSuspensos(agora) : 0;
+}
+
+}  // namespace sabia

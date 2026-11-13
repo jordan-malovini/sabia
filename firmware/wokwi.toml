@@ -2,3 +2,8 @@
 version = 1
 firmware = '.pio/build/esp32s3/firmware.bin'
 elf = '.pio/build/esp32s3/firmware.elf'
+
+# Página web no simulador: com a simulação rodando, abra http://localhost:8180
+[[net.forward]]
+from = "localhost:8180"
+to = "target:80"

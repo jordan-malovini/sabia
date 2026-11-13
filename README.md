@@ -78,11 +78,19 @@ O BME280 e o VEML7700 não existem no Wokwi e ficam para a bancada.
 
 **Queda de energia:** se a energia cair no meio da rega, ao voltar o SABIÁ espera 10 min (30 s no simulador) e retoma de onde parou. Na tela, clique retoma na hora e clique longo cancela; no serial, `retomar` e `cancelar`. Para testar, ligue um setor, espere um pouco e digite `reiniciar`.
 
-**Página web:** abra `firmware/data/index.html` no navegador para ver em modo demonstração (dados simulados, qualquer senha). Testes: `node tests/pagina/teste-pagina.mjs` (precisa do Node 22 e do Google Chrome).
+**Página web:** a página vai embutida no firmware (uma gravação só) e comanda o controlador pela rede.
+- **Primeira vez, na placa:** sem Wi-Fi configurado, o SABIÁ liga a rede própria **SABIA** (senha `sabia1234`). Conecte o celular nela e abra `http://192.168.4.1`. Em Ajustes → Rede, informe o Wi-Fi da casa. Outra forma é digitar `wifi NOME SENHA` no monitor serial.
+- **No dia a dia:** com o Wi-Fi da casa, abra `http://sabia.local` ou o endereço que o comando `wifi` mostra no serial. Se o Wi-Fi da casa cair, a rede própria volta sozinha depois de 20 s.
+- **Senha da página:** de fábrica é `sabia1234`. Ver o painel é livre; ligar, parar e mudar ajustes pede a senha. Troque em Ajustes → Segurança (a página avisa enquanto não trocar). Esqueceu? `senha padrao` no serial volta para a de fábrica.
+- **No Wokwi:** com a simulação rodando, abra `http://localhost:8180`.
+- **Sem placa:** abra `firmware/data/index.html` direto no navegador para ver em modo demonstração (dados simulados, qualquer senha).
+- Clima, água no solo e histórico ainda aparecem vazios: dependem dos sensores e do registro no cartão SD.
 
-**Credenciais:** copie `firmware/include/secrets.example.h` para `secrets.h` e preencha. O `secrets.h` não vai para o repositório.
+Testes da página (Node 22 e Google Chrome): `node tests/pagina/teste-pagina.mjs` (modo demonstração) e `node tests/pagina/teste-api.mjs` (contra um controlador simulado).
 
-Bibliotecas previstas: U8g2 (display), ESP32Encoder (encoder), RTClib (DS3231), drivers do BME280 e do VEML7700, LittleFS, SD e Preferences.
+**Credenciais:** opcional. Para já gravar a placa com o seu Wi-Fi e as suas senhas, copie `firmware/include/secrets.example.h` para `secrets.h` e preencha. O `secrets.h` não vai para o repositório.
+
+Bibliotecas em uso: U8g2 (display), RTClib (relógio), ArduinoJson (API da página) e, do próprio ESP32, WiFi, WebServer, ESPmDNS e Preferences. Previstas: drivers do BME280 e do VEML7700 e SD.
 
 ## Estrutura do repositório
 

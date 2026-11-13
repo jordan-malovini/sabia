@@ -2,13 +2,19 @@
 
 A página (`firmware/data/index.html`) conversa com o ESP32 por JSON. Este documento é o contrato: o firmware implementa estes endereços, e a página já está escrita para usá-los.
 
-Enquanto o firmware não responder a `/api/estado`, a página entra em **modo demonstração** e simula tudo no navegador. É assim que ela funciona quando aberta direto do computador.
+O firmware implementa este contrato em `firmware/src/web.cpp` (servidor) e `firmware/lib/Api` (conversão do JSON, com testes). A página vai embutida no firmware: o `embutir_pagina.py` compacta o `index.html` a cada compilação, então uma gravação só leva tudo para a placa.
+
+Se `/api/estado` não responder, a página entra em **modo demonstração** e simula tudo no navegador. É assim que ela funciona quando aberta direto do computador.
+
+**Ainda sem dados no firmware:** sensores de clima, balanço hídrico, cartão SD e histórico. Esses campos vêm `null` (ou listas vazias) e a página mostra um traço ou um aviso. Estão marcados abaixo.
 
 ## Sessão e segurança (RF16)
 
 - Ler (`GET`) é livre. Quem está na rede vê o painel.
 - Alterar (`POST`, `PUT`, `DELETE`) exige sessão. Sem ela, a resposta é **401** e a página pede a senha.
-- A sessão é um cookie `HttpOnly` criado pelo `POST /api/sessao`, que expira depois de `seguranca.sessaoMin` sem uso.
+- A sessão é um cookie `HttpOnly` e `SameSite=Strict` criado pelo `POST /api/sessao`, que expira depois de `seguranca.sessaoMin` sem uso. Até 4 aparelhos ao mesmo tempo.
+- A senha da página fica gravada só como hash com sal. Depois de uma senha errada, o controlador recusa novas tentativas por 2 s (`429`).
+- De fábrica a senha é `sabia1234` (ou a do `secrets.h`). Enquanto ela não for trocada, o estado traz `sessao.senhaPadrao: true` e a página avisa.
 
 | Método | Caminho | Corpo | Resposta |
 | --- | --- | --- | --- |
@@ -29,7 +35,7 @@ Enquanto o firmware não responder a `/api/estado`, a página entra em **modo de
     "drive": { "ativo": true, "ultimoEnvio": "ontem, 23:00" },
     "rtc": true, "ligadoHa": 273600
   },
-  "sessao": { "logado": false },
+  "sessao": { "logado": false, "senhaPadrao": false },
   "atual": {
     "setor": 4, "fase": "regando", "restanteS": 720, "duracaoS": 2400,
     "bomba": true, "origem": "programa A"
@@ -37,6 +43,7 @@ Enquanto o firmware não responder a `/api/estado`, a página entra em **modo de
   "fila": [ { "setor": 6, "duracaoS": 2400 } ],
   "proximaRega": { "programa": "B", "hora": "20:00", "quando": "hoje" },
   "pausaChuvaDias": 0,
+  "retomada": null,
   "clima": {
     "chuvaHojeMm": 4.2, "chuvaMesMm": 86, "tempC": 27.5,
     "tempMaxC": 31.2, "tempMinC": 21.4, "et0HojeMm": 4.6
@@ -47,12 +54,15 @@ Enquanto o firmware não responder a `/api/estado`, a página entra em **modo de
 }
 ```
 
-- `atual` é `null` quando nada está regando.
+- `hora` é a hora local do relógio (RTC), sempre com `-03:00`; vem `null` se o relógio não responder.
+- `atual` é `null` quando nada está regando. `origem` ainda não é enviado pelo firmware.
 - `fase` segue o `Controlador`: `abrindo`, `regando`, `trocando`, `fechando` ou `pausa`. Em `trocando`, a válvula do próximo setor já abriu e a bomba continua ligada.
 - `origem` pode ser `programa A`, `programa B`, `programa C`, `ciclo`, `manual` ou `retomada`.
 - `proximaRega` é o próximo início da agenda (`null` se nenhum programa estiver ligado). `quando` vem pronto para mostrar: `hoje`, `amanhã` ou o dia da semana.
 - `pausaChuvaDias` é quantos dias faltam na pausa por chuva (0 = sem pausa).
-- `setores` tem sempre 8 itens. `saldoPct` é a água no solo em relação a `estacao.capacidadeSoloMm`.
+- `retomada` deixa de ser `null` enquanto o controlador espera para retomar uma rega depois de uma queda de energia: `{ "faltamS": 540, "setor": 3, "setores": 2, "semEnergiaMin": 4 }`.
+- `setores` tem sempre 8 itens. `saldoPct` é a água no solo em relação a `estacao.capacidadeSoloMm`. Sem `proxima`, a página calcula a próxima rega de cada setor pela agenda.
+- Ainda `null` no firmware: `sistema.cartaoSd`, todo o `clima` menos `chuvaHojeMm`, e `saldoPct` e `adiadoAte` dos setores.
 
 ## Comandos
 
@@ -63,11 +73,13 @@ Enquanto o firmware não responder a `/api/estado`, a página entra em **modo de
 | `ligar` | `setor`, `minutos` | Põe o setor na fila (ou liga, se nada estiver regando). `minutos` é cortado no `tempoMaxMin` do setor. |
 | `parar` | `setor` | Encerra o setor, se for o atual, ou o tira da fila. |
 | `pular` | | Encerra o setor atual e segue a fila. |
-| `pararTudo` | | Esvazia a fila e encerra o setor atual. |
+| `pararTudo` | | Esvazia a fila, encerra o setor atual e descarta programas em espera e a retomada pendente. |
 | `programa` | `programa` (0 = A, 1 = B, 2 = C) | Põe na fila os setores do programa, com os tempos e o ajuste dele, mesmo que o programa esteja desligado ou hoje não seja dia de rega. |
 | `ciclo` | | Ciclo de teste: põe todos os setores ativos na fila, cada um com a duração padrão. |
 | `chuva` | `dias` (0 a 14) | Pausa a agenda por esse número de dias. 0 cancela a pausa. Não afeta o que for ligado na mão. |
-| `acertarHora` | `hora` (ISO 8601) | Acerta o RTC pela hora do aparelho. |
+| `acertarHora` | `hora` (`AAAA-MM-DDTHH:MM:SS`, hora local) | Acerta o RTC pela hora do aparelho que abriu a página. |
+| `retomar` | | Durante a espera depois de uma queda de energia: retoma a rega agora. |
+| `cancelarRetomada` | | Durante a espera: desiste de retomar a rega. |
 | `reiniciar` | | Reinicia o ESP. A rega em andamento volta depois da espera, se a retomada estiver ligada (RF13). |
 
 Resposta: `200 {"ok": true}`, ou `400` com o motivo em texto (por exemplo, "Esse setor já está na fila"). A página mostra esse texto.
@@ -112,7 +124,7 @@ Resposta: `200 {"ok": true}`, ou `400` com o motivo em texto (por exemplo, "Esse
 Regras:
 - `programas` tem sempre 3 itens (A, B, C), no modelo da classe `Agenda` do firmware:
   - `inicios`: 4 posições, `"HH:MM"` ou `null`.
-  - `modo`: `semana` (usa `dias`), `impares`, `pares` (dia do mês) ou `intervalo` (a cada `intervaloDias`, de 1 a 31, contando de `inicioIntervalo`).
+  - `modo`: `semana` (usa `dias`), `impares`, `pares` (dia do mês) ou `intervalo` (a cada `intervaloDias`, de 1 a 30, contando de `inicioIntervalo`).
   - `minutos`: 8 posições, de 0 a 180. 0 deixa o setor fora do programa.
   - `ajustePct`: de 5 a 200. O tempo de cada setor é `minutos × ajustePct / 100`, calculado em segundos e cortado no `tempoMaxMin` do setor.
 - `dias` começa no domingo (índice 0).
@@ -120,6 +132,8 @@ Regras:
 - `retomada`: ver `docs/decisoes/2026-11-13-retomada-apos-queda-de-energia.md`.
 - **Senhas nunca saem do ESP.** No `GET`, `rede.wifiSenha` e `rede.apSenha` voltam vazias. No `PUT`, uma senha vazia significa "manter a atual".
 - Para trocar a senha da página, o `PUT` traz `seguranca.novaSenha`. Esse campo não é guardado como texto e não volta no `GET`.
+- O firmware guarda o documento inteiro, mas hoje só aplica `programas`, `bomba`, `retomada`, `rede`, `seguranca`, `estacao.mmPorBasculada` e, de cada setor, `ativo`, `duracaoMin` e `tempoMaxMin`. Um setor com `ativo: false` não rega por nenhum caminho (agenda, página, encoder ou serial).
+- Trocar algo em `rede` faz o controlador reconectar logo depois de responder.
 - O firmware valida tudo de novo (faixas, `duracaoMin` e os `minutos` dos programas ≤ `tempoMaxMin`, senha do AP com 8 caracteres ou mais) e responde `400` com o motivo se algo estiver errado. A validação da página serve só para ajudar quem está digitando.
 
 ## Histórico
@@ -139,5 +153,7 @@ Regras:
 ```
 
 Em `hoje`, os rótulos são as 24 horas, `tempMaxC` traz a temperatura de cada hora, e `tempMinC` e `et0Mm` vêm `null`.
+
+Enquanto o registro no cartão SD não existir, o firmware devolve todas as listas vazias e `404` no CSV.
 
 `GET /api/csv?tipo=chuva|clima|regas&periodo=...` devolve um CSV com `;` como separador e vírgula decimal, que abre direto no Excel em português.

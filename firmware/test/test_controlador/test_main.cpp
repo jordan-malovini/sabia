@@ -208,6 +208,36 @@ void test_tempo_maximo() {
   TEST_ASSERT_EQUAL(600, c.itemFila(0).duracaoS);
 }
 
+void test_tempo_maximo_por_setor() {
+  SaidasFalsas saidas;
+  Config cfg = configTeste();
+  cfg.tempoMaximoSetorS[2] = 120;  // setor 3: no máximo 2 min
+  Controlador c(saidas, cfg);
+  c.iniciar();
+  TEST_ASSERT_EQUAL(Resultado::Aceito, c.pedir(3, 900));
+  TEST_ASSERT_EQUAL(Resultado::Aceito, c.pedir(4, 900));
+  TEST_ASSERT_EQUAL_UINT32(120, c.itemFila(0).duracaoS);  // limite do setor
+  TEST_ASSERT_EQUAL_UINT32(600, c.itemFila(1).duracaoS);  // limite geral
+}
+
+void test_setor_desativado_nao_rega() {
+  SaidasFalsas saidas;
+  Controlador c(saidas, configTeste());
+  c.iniciar();
+  Config cfg = configTeste();
+  cfg.setorDesativado[4] = true;
+  c.definirConfig(cfg);
+  TEST_ASSERT_EQUAL(Resultado::SetorDesativado, c.pedir(5, 60));
+  uint32_t todos[NUM_SETORES];
+  for (auto& d : todos) d = 60;
+  TEST_ASSERT_EQUAL_UINT8(NUM_SETORES - 1, c.iniciarCiclo(todos));
+  avancar(c, 9UL * 80 * 1000);
+  TEST_ASSERT_EQUAL(Estado::Ocioso, c.estado());
+  TEST_ASSERT_EQUAL(0, saidas.aberturas[5]);
+  TEST_ASSERT_EQUAL(1, saidas.aberturas[4]);
+  TEST_ASSERT_EQUAL(1, saidas.aberturas[6]);
+}
+
 void test_pular_segue_a_fila() {
   SaidasFalsas s;
   Controlador c(s, configTeste());
@@ -327,6 +357,8 @@ int main(int, char**) {
   RUN_TEST(test_setor_repetido_nao_entra);
   RUN_TEST(test_pedidos_invalidos);
   RUN_TEST(test_tempo_maximo);
+  RUN_TEST(test_tempo_maximo_por_setor);
+  RUN_TEST(test_setor_desativado_nao_rega);
   RUN_TEST(test_pular_segue_a_fila);
   RUN_TEST(test_pular_antes_da_bomba);
   RUN_TEST(test_parar_tudo);
