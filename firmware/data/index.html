@@ -673,7 +673,9 @@ function abrirStatus() {
     ["Rede própria (AP)", s.modoAp ? "ativa" : "desligada"],
     [s.cartaoSd?.naFlash ? "Registro" : "Cartão SD", !s.cartaoSd ? "não disponível" : !s.cartaoSd.ok ? "com problema: nada está sendo gravado"
       : (s.cartaoSd.naFlash ? "sem cartão SD, gravando na memória interna" : "ok") + (s.cartaoSd.usoPct != null ? ` · ${s.cartaoSd.usoPct}% usado` : "")],
-    ["Google Drive", s.drive.ativo ? `último envio ${s.drive.ultimoEnvio}` : "desativado"],
+    ["Google Drive", !s.drive.ativo ? "desativado" : s.drive.erro ? `falhou: ${s.drive.erro}`
+      : s.drive.ultimoEnvio ? `enviado até ${s.drive.ultimoEnvio.split("-").reverse().join("/")}` : "ligado, ainda sem envio"],
+    ["Balanço hídrico", e.balancoAtivo ? "ajustando as regas" : estadoApp.config?.balancoHidrico ? "esperando um dia completo de temperatura e a latitude" : "desligado"],
     ["Relógio (RTC)", s.rtc ? "ok" : "sem resposta"],
     ["Ligado há", `${dias} d ${horas} h`],
     ["Firmware", e.versao],
@@ -714,7 +716,8 @@ function desenharDestaque() {
     }
     el.innerHTML = `<div class="info"><p class="suave pequeno">Nada regando</p>
       <p style="font-size:20px;font-weight:600;margin-top:2px">${p ? `Próxima: programa ${esc(p.programa)}, ${esc(p.quando)} às ${esc(p.hora)}` : "Nenhuma rega agendada"}</p>
-      ${e.pausaChuvaDias ? `<p class="suave pequeno" style="margin-top:4px">Regas em pausa por chuva: ${e.pausaChuvaDias} ${e.pausaChuvaDias === 1 ? "dia" : "dias"}</p>` : ""}</div>`;
+      ${e.pausaChuvaDias ? `<p class="suave pequeno" style="margin-top:4px">Regas em pausa por chuva: ${e.pausaChuvaDias} ${e.pausaChuvaDias === 1 ? "dia" : "dias"}</p>` : ""}
+      ${e.adiandoPorChuva ? `<p class="suave pequeno" style="margin-top:4px">Choveu ${num(e.clima.chuva24hMm)} mm em 24 h: as regas automáticas estão adiadas</p>` : ""}</div>`;
     return;
   }
   const a = e.atual;

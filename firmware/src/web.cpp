@@ -367,7 +367,17 @@ static void tratarEstado() {
     cartao["naFlash"] = !registroNoCartao();  // sem cartão, o registro vai para a memória interna
     if (registroUsoPct() >= 0) cartao["usoPct"] = registroUsoPct();
     else cartao["usoPct"] = static_cast<const char*>(nullptr);
-    sistema["drive"]["ativo"] = false;
+    JsonObject drive = sistema["drive"].to<JsonObject>();
+    drive["ativo"] = ajustes.drive;
+    if (driveUltimoDiaEnviado() != 0) {
+      char data[11];
+      dataDeDias(driveUltimoDiaEnviado(), data);
+      drive["ultimoEnvio"] = data;
+    } else {
+      drive["ultimoEnvio"] = static_cast<const char*>(nullptr);
+    }
+    if (driveUltimoErro()[0] != 0) drive["erro"] = driveUltimoErro();
+    else drive["erro"] = static_cast<const char*>(nullptr);
     sistema["rtc"] = temRelogio();
     sistema["ligadoHa"] = static_cast<uint32_t>(esp_timer_get_time() / 1000000LL);
 
@@ -403,12 +413,17 @@ static void tratarEstado() {
     medida("umidadePct", leitura.umidadePct, 0);
     medida("pressaoHpa", leitura.pressaoHpa, 1);
     medida("lux", leitura.lux, 0);
-    medida("et0HojeMm", NAN, 1);
+    medida("et0HojeMm", balancoEt0Hoje(), 1);
+    medida("chuva24hMm", balancoChuva24hMm(), 1);
+    doc["adiandoPorChuva"] = balancoAdiando();
+    doc["balancoAtivo"] = ajustes.balancoHidrico && balancoConfiavel();
 
     JsonArray setores = doc["setores"].to<JsonArray>();
     for (uint8_t i = 0; i < NUM_SETORES; i++) {
       JsonObject s = setores.add<JsonObject>();
-      s["saldoPct"] = static_cast<const char*>(nullptr);
+      // Sem um dia fechado com temperatura e latitude, o saldo não quer dizer nada.
+      if (balancoConfiavel()) s["saldoPct"] = balancoSaldoPct(i + 1);
+      else s["saldoPct"] = static_cast<const char*>(nullptr);
       s["adiadoAte"] = static_cast<const char*>(nullptr);
     }
     serializeJson(doc, corpo);
@@ -671,10 +686,11 @@ static void tarefaWeb(void*) {
   for (;;) {
     servidor.handleClient();
     redeTick();
+    driveTick();
     delay(2);
   }
 }
 
-void webIniciar() { xTaskCreatePinnedToCore(tarefaWeb, "web", 12288, nullptr, 1, nullptr, ARDUINO_RUNNING_CORE); }
+void webIniciar() { xTaskCreatePinnedToCore(tarefaWeb, "web", 16384, nullptr, 1, nullptr, ARDUINO_RUNNING_CORE); }
 
 }  // namespace sabia

@@ -31,6 +31,11 @@ Formato: uma seção por versão, da mais nova para a mais antiga.
 - Limite de tempo por setor e setor desativado valem para todos os caminhos (agenda, página, encoder e serial).
 - Comandos de serial `wifi`, `wifi NOME SENHA` e `senha padrao`.
 - 11 testes da conversão JSON da API (`firmware/test/test_api`) e 16 testes da página contra um controlador simulado (`tests/pagina/teste-api.mjs`).
+- Watchdog (RF15): se o programa travar por 15 s, o ESP reinicia com tudo desligado e a rega segue pela retomada.
+- Sensores de clima: BME280 (temperatura, umidade, pressão) e VEML7700 (luz). Sem sensor, a leitura fica vazia e o resto segue normal.
+- Registro (RF06, RF11): um CSV por dia com chuva a cada 10 min, clima por hora, regas e eventos, no cartão microSD ou, sem cartão, na memória do ESP. Histórico de hoje, 7 e 30 dias na página, com download em CSV.
+- Balanço hídrico (RF08): ET0 por Hargreaves, saldo de água por setor e ajuste do tempo das regas automáticas. Só economiza: encurta ou pula, nunca passa do tempo do programa, e não interfere sem dados confiáveis. Adiamento automático quando chove mais que o limite em 24 h.
+- Envio do registro ao Google Drive por Apps Script (`tools/drive/Codigo.gs`, passo a passo em `docs/drive.md`), apagando do cartão só depois da confirmação.
 - Nome do projeto: SABIÁ (Sistema Automático de Balanço e Irrigação Agrícola).
 - Documentação dividida em README e `docs/` (requisitos, arquitetura, hardware e mapa de pinos).
 - Requisitos de segurança RF14 (saídas desligadas no boot), RF15 (watchdog) e RF16 (senha e autenticação na página web).

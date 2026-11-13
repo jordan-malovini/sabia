@@ -6,7 +6,7 @@ O firmware implementa este contrato em `firmware/src/web.cpp` (servidor) e `firm
 
 Se `/api/estado` não responder, a página entra em **modo demonstração** e simula tudo no navegador. É assim que ela funciona quando aberta direto do computador.
 
-**Ainda sem dados no firmware:** sensores de clima, balanço hídrico, cartão SD e histórico. Esses campos vêm `null` (ou listas vazias) e a página mostra um traço ou um aviso. Estão marcados abaixo.
+**Campos sem dado vêm `null`:** sem sensor de clima, sem relógio ou antes de o balanço hídrico ter um dia completo, a página mostra um traço ou um aviso no lugar.
 
 ## Sessão e segurança (RF16)
 
@@ -31,8 +31,8 @@ Se `/api/estado` não responder, a página entra em **modo demonstração** e si
   "hora": "2026-11-07T14:32:10-03:00",
   "sistema": {
     "wifi": true, "ip": "192.168.0.50", "modoAp": false,
-    "cartaoSd": { "ok": true, "usoPct": 12 },
-    "drive": { "ativo": true, "ultimoEnvio": "ontem, 23:00" },
+    "cartaoSd": { "ok": true, "naFlash": false, "usoPct": 12 },
+    "drive": { "ativo": true, "ultimoEnvio": "2026-11-06", "erro": null },
     "rtc": true, "ligadoHa": 273600
   },
   "sessao": { "logado": false, "senhaPadrao": false },
@@ -44,9 +44,11 @@ Se `/api/estado` não responder, a página entra em **modo demonstração** e si
   "proximaRega": { "programa": "B", "hora": "20:00", "quando": "hoje" },
   "pausaChuvaDias": 0,
   "retomada": null,
+  "adiandoPorChuva": false, "balancoAtivo": true,
   "clima": {
-    "chuvaHojeMm": 4.2, "chuvaMesMm": 86, "tempC": 27.5,
-    "tempMaxC": 31.2, "tempMinC": 21.4, "et0HojeMm": 4.6
+    "chuvaHojeMm": 4.2, "chuva24hMm": 4.2, "chuvaMesMm": 86, "tempC": 27.5,
+    "tempMaxC": 31.2, "tempMinC": 21.4, "umidadePct": 62, "pressaoHpa": 1009.8, "lux": 54321,
+    "et0HojeMm": 4.6
   },
   "setores": [
     { "saldoPct": 62, "proxima": "20:00 · 35 min", "adiadoAte": null }
@@ -62,7 +64,10 @@ Se `/api/estado` não responder, a página entra em **modo demonstração** e si
 - `pausaChuvaDias` é quantos dias faltam na pausa por chuva (0 = sem pausa).
 - `retomada` deixa de ser `null` enquanto o controlador espera para retomar uma rega depois de uma queda de energia: `{ "faltamS": 540, "setor": 3, "setores": 2, "semEnergiaMin": 4 }`.
 - `setores` tem sempre 8 itens. `saldoPct` é a água no solo em relação a `estacao.capacidadeSoloMm`. Sem `proxima`, a página calcula a próxima rega de cada setor pela agenda.
-- Ainda `null` no firmware: `sistema.cartaoSd`, todo o `clima` menos `chuvaHojeMm`, e `saldoPct` e `adiadoAte` dos setores.
+- `sistema.cartaoSd.naFlash` é `true` quando não há cartão e o registro vai para a memória interna do ESP. `ok` fica `false` se uma gravação falhar. `usoPct` só é medido na memória interna; com cartão vem `null`.
+- `sistema.drive.ultimoEnvio` é o último dia confirmado pelo Drive; `erro` traz o motivo da última falha.
+- `adiandoPorChuva`: choveu mais que `chuvaAdiarMm` em 24 h e os inícios automáticos estão sendo pulados. `balancoAtivo`: o balanço hídrico está ajustando os tempos (ver `docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md`).
+- `clima.et0HojeMm` é uma estimativa com a máxima e a mínima até agora. `saldoPct` fica `null` até o balanço fechar um dia com temperatura e latitude. `adiadoAte` ainda não é enviado.
 
 ## Comandos
 
@@ -132,7 +137,7 @@ Regras:
 - `retomada`: ver `docs/decisoes/2026-11-13-retomada-apos-queda-de-energia.md`.
 - **Senhas nunca saem do ESP.** No `GET`, `rede.wifiSenha` e `rede.apSenha` voltam vazias. No `PUT`, uma senha vazia significa "manter a atual".
 - Para trocar a senha da página, o `PUT` traz `seguranca.novaSenha`. Esse campo não é guardado como texto e não volta no `GET`.
-- O firmware guarda o documento inteiro, mas hoje só aplica `programas`, `bomba`, `retomada`, `rede`, `seguranca`, `estacao.mmPorBasculada` e, de cada setor, `ativo`, `duracaoMin` e `tempoMaxMin`. Um setor com `ativo: false` não rega por nenhum caminho (agenda, página, encoder ou serial).
+- O firmware guarda o documento inteiro. Ainda não aplica: `janela` dos setores, `tipo`, `relogio` (NTP e fuso) e `display`. Um setor com `ativo: false` não rega por nenhum caminho (agenda, página, encoder ou serial).
 - Trocar algo em `rede` faz o controlador reconectar logo depois de responder.
 - O firmware valida tudo de novo (faixas, `duracaoMin` e os `minutos` dos programas ≤ `tempoMaxMin`, senha do AP com 8 caracteres ou mais) e responde `400` com o motivo se algo estiver errado. A validação da página serve só para ajudar quem está digitando.
 
@@ -154,6 +159,8 @@ Regras:
 
 Em `hoje`, os rótulos são as 24 horas, `tempMaxC` traz a temperatura de cada hora, e `tempMinC` e `et0Mm` vêm `null`.
 
-Enquanto o registro no cartão SD não existir, o firmware devolve todas as listas vazias e `404` no CSV.
+Nos períodos de 7 e 30 dias, os rótulos são o dia da semana ou o dia do mês, e um dia sem leitura vem `null` em `tempMaxC`, `tempMinC` e `et0Mm`. `regas` só traz os setores que regaram. `eventos` traz os mais recentes de hoje, como `["14:20", "Setor 4 regou 40 min"]`.
+
+Sem relógio (RTC) o controlador não sabe a data e não grava o registro: todas as listas vêm vazias e o CSV responde `404`.
 
 `GET /api/csv?tipo=chuva|clima|regas&periodo=...` devolve um CSV com `;` como separador e vírgula decimal, que abre direto no Excel em português.

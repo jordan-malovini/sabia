@@ -203,6 +203,37 @@ void test_ler_ajustes() {
   TEST_ASSERT_EQUAL_UINT32(900, a.retomada.esperaS);
   TEST_ASSERT_TRUE(a.mmPorBasculada > 0.249f && a.mmPorBasculada < 0.251f);
 
+  // Balanço hídrico e Drive
+  TEST_ASSERT_TRUE(isnan(a.latitude));  // latitude não informada
+  TEST_ASSERT_FALSE(a.drive);
+  doc["estacao"]["latitude"] = -14.79;
+  doc["estacao"]["capacidadeSoloMm"] = 55;
+  doc["setores"][1]["taxaMmH"] = 6;
+  doc["setores"][1]["eficienciaPct"] = 80;
+  doc["setores"][1]["kc"] = 0.85;
+  doc["chuvaAdiarMm"] = 8;
+  doc["registro"]["drive"] = true;
+  doc["registro"]["driveUrl"] = "https://script.google.com/macros/s/abc/exec";
+  doc["registro"]["envioHoras"] = 6;
+  TEST_ASSERT_NULL(validarConfig(doc.as<JsonVariantConst>()));
+  lerAjustes(doc.as<JsonVariantConst>(), a);
+  TEST_ASSERT_TRUE(a.latitude < -14.78f && a.latitude > -14.80f);
+  TEST_ASSERT_TRUE(a.solo.capacidadeMm == 55);
+  TEST_ASSERT_TRUE(a.setores[1].taxaMmH == 6 && a.setores[1].eficiencia > 0.79f && a.setores[1].eficiencia < 0.81f);
+  TEST_ASSERT_TRUE(a.setores[1].kc > 0.84f && a.setores[1].kc < 0.86f);
+  TEST_ASSERT_TRUE(a.chuvaAdiarMm == 8);
+  TEST_ASSERT_TRUE(a.drive);
+  TEST_ASSERT_EQUAL_STRING("https://script.google.com/macros/s/abc/exec", a.driveUrl);
+  TEST_ASSERT_EQUAL_UINT16(6, a.envioHoras);
+  doc["registro"]["driveUrl"] = "";  // Drive ligado sem endereço não passa
+  TEST_ASSERT_NOT_NULL(validarConfig(doc.as<JsonVariantConst>()));
+  doc["registro"]["drive"] = false;
+  doc["estacao"]["latitude"] = 120;
+  TEST_ASSERT_NOT_NULL(validarConfig(doc.as<JsonVariantConst>()));
+  doc["estacao"]["latitude"] = -14.79;
+  doc["setores"][0]["taxaMmH"] = 0;  // taxa zero daria divisão por zero no tempo de rega
+  TEST_ASSERT_NOT_NULL(strstr(validarConfig(doc.as<JsonVariantConst>()), "Setor 1"));
+
   // Documento vazio: tudo no padrão, sem travar.
   JsonDocument vazio;
   lerAjustes(vazio.as<JsonVariantConst>(), a);

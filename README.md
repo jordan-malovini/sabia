@@ -84,7 +84,11 @@ O BME280 e o VEML7700 não existem no Wokwi e ficam para a bancada.
 - **Senha da página:** de fábrica é `sabia1234`. Ver o painel é livre; ligar, parar e mudar ajustes pede a senha. Troque em Ajustes → Segurança (a página avisa enquanto não trocar). Esqueceu? `senha padrao` no serial volta para a de fábrica.
 - **No Wokwi:** com a simulação rodando, abra `http://localhost:8180`.
 - **Sem placa:** abra `firmware/data/index.html` direto no navegador para ver em modo demonstração (dados simulados, qualquer senha).
-- Clima, água no solo e histórico ainda aparecem vazios: dependem dos sensores e do registro no cartão SD.
+- Temperatura, umidade e luz aparecem quando os sensores estiverem ligados. A água no solo aparece depois de um dia completo com temperatura e com a latitude informada em Ajustes → Estação.
+
+**Registro e histórico:** chuva, clima, regas e eventos são gravados num arquivo por dia, no cartão microSD ou, sem cartão, na memória do ESP. A página mostra hoje, 7 e 30 dias e baixa em CSV. Para mandar ao Google Drive, veja [docs/drive.md](docs/drive.md).
+
+**Balanço hídrico:** nas regas automáticas, o SABIÁ encurta ou pula a rega de um setor que ainda tem água, e nunca rega mais que o tempo do programa. Ele vem desligado de fábrica: antes de ligar, informe a latitude e meça a taxa de aplicação de cada setor. Detalhes em [docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md](docs/decisoes/2026-11-13-balanco-hidrico-so-economiza.md).
 
 Testes da página (Node 22 e Google Chrome): `node tests/pagina/teste-pagina.mjs` (modo demonstração) e `node tests/pagina/teste-api.mjs` (contra um controlador simulado).
 
