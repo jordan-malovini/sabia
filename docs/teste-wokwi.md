@@ -6,7 +6,7 @@ Um teste de cada parte do SABIÁ no simulador, na ordem que faz sentido. Cada pa
 
 ## Antes de começar
 
-1. Mescle os PRs na ordem: #36, #37 e #38.
+1. Mescle os PRs que estiverem abertos.
 2. No VS Code, atualize o projeto (Source Control → Pull, ou `git pull`).
 3. Compile: `pio run -e esp32s3`.
 4. Inicie a simulação: `Ctrl+Shift+P` → **Wokwi: Start Simulator**.
@@ -32,7 +32,7 @@ Um teste de cada parte do SABIÁ no simulador, na ordem que faz sentido. Cada pa
 | --- | --- | --- |
 | 1.1 | Só inicie a simulação. | A tela mostra a logo e, depois de 2 s, a tela de estado com a hora. Todos os LEDs apagados. |
 | 1.2 | Olhe o monitor serial. | Aparece `SABIA v0.4-dev`, `Sensores: BME280 nao encontrado, VEML7700 nao encontrado` (normal: o Wokwi não tem esses sensores) e `Registro: cartao SD`. |
-| 1.3 | Espere até 20 s. | Aparece `Wi-Fi "Wokwi-GUEST" conectado. Pagina: http://...`. |
+| 1.3 | Espere até 20 s. | Aparece `Wi-Fi "Wokwi-GUEST" conectado. Pagina: http://localhost:8180`. |
 | 1.4 | Espere mais alguns segundos. | Pode aparecer `Relogio acertado pela internet`. A hora da tela deve ficar igual à de Brasília. |
 
 > Se a hora ficar errada, acerte na mão: `hora 2026-11-13 15:30` (com a data e a hora de agora).
@@ -100,6 +100,9 @@ g A d 1111111
 ## Parte 7: página web
 
 Abra **http://localhost:8180** no navegador do computador, com a simulação rodando.
+
+- O endereço `10.13.37.2` e o `sabia.local` só existem dentro do simulador: do computador, use sempre `localhost:8180`.
+- Deixe a aba do simulador visível no VS Code (por exemplo, com o navegador ao lado). Com a aba escondida, o Wokwi pode pausar a simulação, e a página fica sem resposta.
 
 | # | Faça | Deve acontecer |
 | --- | --- | --- |
