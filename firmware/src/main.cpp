@@ -26,6 +26,8 @@
 //   wifi                 mostra a rede e o endereço da página
 //   wifi NOME SENHA      troca o Wi-Fi da casa (nome sem espaços)
 //   senha padrao         volta a senha da página para a de fábrica
+// Teste:
+//   testar watchdog      trava o loop de propósito; o ESP deve reiniciar em 15 s
 
 #include <Arduino.h>
 #include <Preferences.h>
@@ -60,6 +62,10 @@ class SaidasReles : public Saidas {
     digitalWrite(pino, ligado ? RELE_LIGADO : RELE_DESLIGADO);
   }
 };
+
+// RF15: se o loop parar de rodar por 15 s, o watchdog reinicia o ESP. As saídas
+// voltam desligadas (RF14) e a rega segue pela retomada, depois da espera.
+constexpr uint32_t WATCHDOG_S = 15;
 
 static SaidasReles saidas;
 Ajustes sabia::ajustes;
@@ -404,6 +410,12 @@ static void tratarComando(const String& linha) {
     Serial.printf("Wi-Fi trocado para \"%s\". Conectando...\r\n> ", nome.c_str());
     return;
   }
+  if (linha == "testar watchdog") {
+    // Simula um travamento: o loop para de avisar o watchdog e o ESP reinicia.
+    Serial.printf("Travando o programa de proposito. O ESP deve reiniciar em %lu s.\r\n", static_cast<unsigned long>(WATCHDOG_S));
+    Serial.flush();
+    for (;;) delay(1000);
+  }
   if (linha == "senha padrao") {
     webRestaurarSenhaPadrao();
     Serial.print("Senha da pagina voltou para a de fabrica\r\n> ");
@@ -468,9 +480,6 @@ static void tratarComando(const String& linha) {
   Serial.print("> ");
 }
 
-// RF15: se o loop parar de rodar por 15 s, o watchdog reinicia o ESP. As saídas
-// voltam desligadas (RF14) e a rega segue pela retomada, depois da espera.
-constexpr uint32_t WATCHDOG_S = 15;
 
 static void iniciarWatchdog() {
 #if ESP_IDF_VERSION_MAJOR >= 5

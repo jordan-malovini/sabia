@@ -57,6 +57,14 @@ static const char* const TIPO_TEXTO = "text/plain; charset=utf-8";
 
 static WebServer servidor(80);
 
+// No simulador, o endereço do ESP (10.13.37.2) só existe dentro do Wokwi; do
+// computador, a página abre pelo redirecionamento do wokwi.toml.
+#ifdef SABIA_SIMULADOR
+static String enderecoDaPagina() { return "http://localhost:8180 (no navegador do computador)"; }
+#else
+static String enderecoDaPagina() { return "http://" + WiFi.localIP().toString() + " ou http://sabia.local"; }
+#endif
+
 // ---------------------------------------------------------------------------
 // Rede
 // ---------------------------------------------------------------------------
@@ -147,8 +155,7 @@ static void redeTick() {
     ultimoNtpMs = 0;  // acabou de conectar: confere o relógio logo
     MDNS.end();
     if (MDNS.begin("sabia")) MDNS.addService("http", "tcp", 80);
-    Serial.printf("\r\nWi-Fi \"%s\" conectado. Pagina: http://%s ou http://sabia.local\r\n", nomeWifi.c_str(),
-                  WiFi.localIP().toString().c_str());
+    Serial.printf("\r\nWi-Fi \"%s\" conectado. Pagina: %s\r\n", nomeWifi.c_str(), enderecoDaPagina().c_str());
   }
   if (!conectado && estavaConectado) semConexaoDesdeMs = ultimaTentativaMs = millis();
   estavaConectado = conectado;
@@ -170,8 +177,7 @@ void webReconfigurarRede() { reconfigurarRede = true; }
 
 void webMostrarRede(Print& saida) {
   if (WiFi.status() == WL_CONNECTED) {
-    saida.printf("Wi-Fi \"%s\" conectado. Pagina: http://%s ou http://sabia.local\r\n", nomeWifi.c_str(),
-                 WiFi.localIP().toString().c_str());
+    saida.printf("Wi-Fi \"%s\" conectado. Pagina: %s\r\n", nomeWifi.c_str(), enderecoDaPagina().c_str());
   } else if (temWifiDaCasa) {
     saida.printf("Wi-Fi \"%s\": sem conexao\r\n", nomeWifi.c_str());
   } else {
