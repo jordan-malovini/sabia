@@ -42,6 +42,7 @@ struct Momento {
 uint32_t diasDesde2000(uint16_t ano, uint8_t mes, uint8_t dia);
 uint8_t diaDaSemana(uint32_t dias);  // 0 = domingo ... 6 = sábado
 uint8_t diaDoMes(uint32_t dias);
+uint32_t minutoAbsoluto(const Momento& m);  // minutos desde 01/01/2000
 
 enum class ModoDias : uint8_t {
   Semana,     // dias da semana marcados em diasSemana

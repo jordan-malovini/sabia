@@ -2,13 +2,16 @@
 //
 // Girar navega ou altera o valor, clique curto seleciona, clique longo volta.
 // Fluxo para ligar um setor: menu -> escolher o setor -> escolher o tempo.
-// O menu também inicia um programa da agenda e suspende as regas por chuva.
+// O menu também inicia um programa, edita a agenda (Programar agenda) e
+// suspende as regas por chuva. Depois de uma queda de energia, a tela de
+// estado mostra a contagem para retomar a rega.
 #pragma once
 
 #include <stdint.h>
 
 #include "Agenda.h"
 #include "Controlador.h"
+#include "Retomada.h"
 
 namespace sabia {
 
@@ -21,7 +24,8 @@ struct DadosTela {
 
 void interfaceIniciar();
 // Retorna true quando a agenda foi alterada pelo menu e precisa ser salva.
-bool interfaceAtualizar(Controlador& controlador, Agenda& agenda, const DadosTela& dados, uint32_t agoraMs);
+bool interfaceAtualizar(Controlador& controlador, Agenda& agenda, Retomada& retomada, const DadosTela& dados,
+                        uint32_t agoraMs);
 
 // Durações oferecidas ao ligar um setor (em segundos), também usadas no serial.
 extern const uint32_t DURACOES_S[];

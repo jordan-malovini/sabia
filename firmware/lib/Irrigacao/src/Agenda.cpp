@@ -35,7 +35,7 @@ uint8_t diaDoMes(uint32_t dias) {
   return 1;
 }
 
-static uint32_t minutoAbsoluto(const Momento& m) {
+uint32_t minutoAbsoluto(const Momento& m) {
   return diasDesde2000(m.ano, m.mes, m.dia) * 1440UL + m.hora * 60UL + m.minuto;
 }
 

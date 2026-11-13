@@ -19,6 +19,9 @@
 //   g A run            inicia o programa agora
 //   chuva 3            não rega por 3 dias (0 cancela)
 //   hora 2026-11-12 19:55   acerta o relógio
+// Queda de energia:
+//   retomar | cancelar   durante a espera depois que a energia volta
+//   reiniciar            reinicia o ESP (para testar a retomada)
 
 #include <Arduino.h>
 #include <Preferences.h>
@@ -29,6 +32,7 @@
 
 #include "Agenda.h"
 #include "Controlador.h"
+#include "Retomada.h"
 #include "interface.h"
 #include "pinos.h"
 
@@ -54,6 +58,20 @@ static SaidasReles saidas;
 static Controlador controlador(saidas);
 static Agenda agenda(controlador);
 static Preferences memoria;
+
+static ConfigRetomada configRetomada() {
+  ConfigRetomada c;
+#ifdef SABIA_SIMULADOR
+  c.esperaS = 30;   // no simulador, meio minuto basta para ver a contagem
+#else
+  c.esperaS = 600;  // 10 minutos para a rede estabilizar
+#endif
+  c.limiteMin = 120;
+  return c;
+}
+static Retomada retomada(configRetomada());
+static PontoSalvo ultimoPonto;     // o que está gravado na memória
+static uint32_t ultimoPontoMs = 0;
 
 #ifdef SABIA_SIMULADOR
 static RTC_DS1307 rtc;  // o Wokwi só tem o DS1307
@@ -238,6 +256,53 @@ static void comandoAgenda(const String& linha) {
   mostrarAgenda();
 }
 
+// ---------------------------------------------------------------------------
+// Ponto salvo, para retomar a rega depois de uma queda de energia
+// ---------------------------------------------------------------------------
+static uint32_t minutoAgora() {
+  DadosTela d = lerDados();
+  return d.temHora ? minutoAbsoluto(d.agora) : 0;
+}
+
+static bool mesmosSetores(const PontoSalvo& a, const PontoSalvo& b) {
+  if (a.n != b.n) return false;
+  for (uint8_t i = 0; i < a.n; i++) if (a.itens[i].setor != b.itens[i].setor) return false;
+  return true;
+}
+
+// Grava quando a fila muda e, enquanto rega, uma vez por minuto (para o tempo
+// que falta ficar certo sem gastar a memória flash).
+static void salvarPontoSePreciso() {
+  if (retomada.aguardando()) return;  // não apaga o ponto antes de retomar
+  PontoSalvo atual = capturarPonto(controlador, minutoAgora());
+  bool mudou = !mesmosSetores(atual, ultimoPonto);
+  bool passouUmMinuto = atual.n > 0 && millis() - ultimoPontoMs >= 60000UL;
+  if (!mudou && !passouUmMinuto) return;
+  memoria.putBytes("ponto", &atual, sizeof(atual));
+  ultimoPonto = atual;
+  ultimoPontoMs = millis();
+}
+
+static void carregarPonto() {
+  if (memoria.getBytesLength("ponto") != sizeof(PontoSalvo)) return;
+  memoria.getBytes("ponto", &ultimoPonto, sizeof(ultimoPonto));
+  retomada.iniciar(ultimoPonto, minutoAgora(), millis());
+  switch (retomada.estado()) {
+    case EstadoRetomada::Aguardando:
+      Serial.printf("Energia voltou (fora por %lu min). Retomando o setor %u e mais %u em %lu s.\r\n"
+                    "Digite 'retomar' para ir agora ou 'cancelar'.\r\n",
+                    static_cast<unsigned long>(retomada.minutosSemEnergia()), retomada.primeiroSetor(),
+                    retomada.totalSetores() - 1, static_cast<unsigned long>(retomada.faltamS(millis())));
+      break;
+    case EstadoRetomada::Descartada:
+      Serial.printf("Energia ficou fora por %lu min: a rega interrompida nao sera retomada.\r\n",
+                    static_cast<unsigned long>(retomada.minutosSemEnergia()));
+      break;
+    default:
+      break;
+  }
+}
+
 static const char* textoResultado(Resultado r) {
   switch (r) {
     case Resultado::Aceito: return "na fila";
@@ -251,7 +316,8 @@ static const char* textoResultado(Resultado r) {
 
 static void ajuda() {
   Serial.print("Comandos: l | l N S | c S | p | x N | s | ?\r\n"
-               "Agenda:   a | g A on/off/h/d/t/%/run | chuva N | hora AAAA-MM-DD HH:MM\r\n> ");
+               "Agenda:   a | g A on/off/h/d/t/%/run | chuva N | hora AAAA-MM-DD HH:MM\r\n"
+               "Energia:  retomar | cancelar | reiniciar\r\n> ");
 }
 
 // Ligar em duas etapas pelo serial: primeiro o setor, depois o tempo.
@@ -284,6 +350,17 @@ static void tratarComando(const String& linha) {
   }
   if (linha.length() == 0) { Serial.print("> "); return; }
 
+  if (linha == "retomar" || linha == "cancelar") {
+    if (!retomada.aguardando()) Serial.print("Nao ha rega esperando para retomar\r\n> ");
+    else if (linha == "retomar") { retomada.retomarAgora(); Serial.print("Retomando a rega\r\n> "); }
+    else { retomada.cancelar(); Serial.print("Retomada cancelada\r\n> "); }
+    return;
+  }
+  if (linha == "reiniciar") {
+    Serial.print("Reiniciando...\r\n");
+    Serial.flush();
+    ESP.restart();
+  }
   if (linha.startsWith("chuva")) {
     int dias = linha.substring(5).toInt();
     agenda.suspender(dias < 0 ? 0 : dias, lerDados().agora);
@@ -362,6 +439,7 @@ void setup() {
   delay(200);
   Serial.print("\r\nSABIA v" SABIA_VERSAO "\r\n");
   if (!temRtc) Serial.print("Aviso: relogio (RTC) nao encontrado\r\n");
+  carregarPonto();
   ajuda();
 }
 
@@ -389,6 +467,7 @@ void loop() {
   uint32_t agora = millis();
   Estado antes = controlador.estado();
   uint8_t setorAntes = controlador.setorAtivo();
+  if (retomada.tick(controlador, agora)) Serial.print("\r\nRetomando a rega interrompida\r\n");
   controlador.tick(agora);
   if (controlador.estado() != antes || controlador.setorAtivo() != setorAntes) {
     Serial.print("\r\n");
@@ -399,5 +478,6 @@ void loop() {
 
   DadosTela dados = lerDados();
   if (dados.temHora) agenda.tick(dados.agora);  // sem relógio, a agenda não roda
-  if (interfaceAtualizar(controlador, agenda, dados, agora)) salvarAgenda();
+  if (interfaceAtualizar(controlador, agenda, retomada, dados, agora)) salvarAgenda();
+  salvarPontoSePreciso();
 }

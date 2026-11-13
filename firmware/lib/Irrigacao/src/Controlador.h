@@ -83,6 +83,7 @@ class Controlador {
   Estado estado() const { return estado_; }
   uint8_t setorAtivo() const { return atual_.setor; }  // 0 se nenhum
   uint8_t proximoSetor() const { return proximo_.setor; }  // só durante a troca
+  Pedido proximoPedido() const { return proximo_; }
   uint32_t restanteS() const;
   size_t tamanhoFila() const { return tamanho_; }
   Pedido itemFila(size_t indice) const;

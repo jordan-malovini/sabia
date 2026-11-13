@@ -32,4 +32,4 @@ constexpr uint8_t PINO_SD_SCK = 39;
 constexpr uint8_t PINO_SD_MISO = 40;
 constexpr uint8_t PINO_SD_MOSI = 41;
 
-#define SABIA_VERSAO "0.3-dev"
+#define SABIA_VERSAO "0.4-dev"

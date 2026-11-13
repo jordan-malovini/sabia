@@ -47,8 +47,8 @@ O antigo guardava o horário do último ciclo iniciado como `hora × 100 + minut
 
 ## Ainda não feito
 
-- Editar os programas pelo encoder. Por enquanto, a edição é pelo monitor serial; pelo encoder dá para iniciar um programa e pausar por chuva.
 - A página web (`firmware/data/index.html`) e o `docs/api.md` ainda descrevem horários por setor ("modo individual" e "modo ciclo"). Precisam passar para o modelo de programas.
 - Cycle and Soak, desvio do sensor de chuva por setor e ligar ou não a bomba por setor.
 - O ajuste percentual é manual. O balanço hídrico (#12) vai calculá-lo sozinho, como o Solar Sync faz nos Hunter.
-- O que fazer quando a energia cai no meio da rega (o antigo espera 10 min e retoma; o RF13 atual diz para não retomar).
+
+Feito depois (13 de novembro): edição dos programas pelo encoder e retomada após queda de energia (ver `2026-11-13-retomada-apos-queda-de-energia.md`).
