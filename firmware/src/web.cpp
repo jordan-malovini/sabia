@@ -65,6 +65,8 @@ static bool apLigado = false, apSempre = false, temWifiDaCasa = false;
 static bool estavaConectado = false;
 static uint32_t semConexaoDesdeMs = 0, conectadoDesdeMs = 0, ultimaTentativaMs = 0;
 static String nomeWifi, nomeAp;
+static uint32_t ultimoNtpMs = 0;  // relógio pela internet (ver acertarPelaInternet)
+static bool ntpFeito = false;
 
 static void ligarAp() {
   if (apLigado) return;
@@ -183,9 +185,6 @@ void webMostrarRede(Print& saida) {
 // Wi-Fi da casa está conectado, ele é conferido na conexão e uma vez por dia,
 // e acertado se estiver errado por 2 s ou mais. Sem internet, vale o RTC.
 // ---------------------------------------------------------------------------
-static uint32_t ultimoNtpMs = 0;
-static bool ntpFeito = false;
-
 static void acertarPelaInternet() {
   int16_t fuso;
   {
