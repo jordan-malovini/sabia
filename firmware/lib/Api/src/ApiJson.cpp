@@ -6,12 +6,20 @@
 
 namespace sabia {
 
+Ajustes::Ajustes() : latitude(NAN) {}
+
 static const char* const MODOS[] = {"semana", "impares", "pares", "intervalo"};
 static char erro_[112];
 
 static bool inteiro(JsonVariantConst v, long minimo, long maximo, long& valor) {
   if (!v.is<long>()) return false;
   valor = v.as<long>();
+  return valor >= minimo && valor <= maximo;
+}
+
+static bool decimal(JsonVariantConst v, float minimo, float maximo) {
+  if (!v.is<float>()) return false;
+  float valor = v.as<float>();
   return valor >= minimo && valor <= maximo;
 }
 
@@ -250,6 +258,11 @@ const char* validarConfig(JsonVariantConst c) {
     if (!inteiro(s["tempoMaxMin"], 1, 240, tempoMax[i])) return erroSetor(i + 1, "tempo máximo fora da faixa (1 a 240 min)");
     if (!inteiro(s["duracaoMin"], 1, 240, duracao)) return erroSetor(i + 1, "duração fora da faixa (1 a 240 min)");
     if (duracao > tempoMax[i]) return erroSetor(i + 1, "a duração passa do tempo máximo");
+    if (!decimal(s["kc"], 0.1f, 2.0f)) return erroSetor(i + 1, "Kc fora da faixa (0,1 a 2)");
+    if (!decimal(s["taxaMmH"], 0.1f, 100.0f)) return erroSetor(i + 1, "taxa de aplicação fora da faixa (0,1 a 100 mm/h)");
+    if (!decimal(s["eficienciaPct"], 10.0f, 100.0f)) return erroSetor(i + 1, "eficiência fora da faixa (10 a 100 %)");
+    if (!decimal(s["deficitMinMm"], 0.0f, 100.0f)) return erroSetor(i + 1, "déficit mínimo fora da faixa (0 a 100 mm)");
+    if (!decimal(s["fator"], 0.1f, 3.0f)) return erroSetor(i + 1, "fator de ajuste fora da faixa (0,1 a 3)");
   }
 
   JsonArrayConst programas = c["programas"].as<JsonArrayConst>();
@@ -289,8 +302,22 @@ const char* validarConfig(JsonVariantConst c) {
     return "Rede: a senha da rede própria deve ter de 8 a 63 caracteres";
   if (!rede["apSempre"].is<bool>()) return "Rede: falta dizer se a rede própria fica sempre ligada";
 
-  JsonVariantConst mm = c["estacao"]["mmPorBasculada"];
-  if (!mm.is<float>() || mm.as<float>() < 0.01f || mm.as<float>() > 2.0f) return "Estação: chuva por basculada fora da faixa (0,01 a 2 mm)";
+  if (!c["balancoHidrico"].is<bool>() || !c["adiarPorChuva"].is<bool>()) return "Clima: falta dizer se o balanço e o adiamento por chuva estão ligados";
+  if (!decimal(c["chuvaAdiarMm"], 0.0f, 100.0f)) return "Clima: chuva que adia a rega fora da faixa (0 a 100 mm)";
+
+  JsonVariantConst estacao = c["estacao"];
+  if (!decimal(estacao["mmPorBasculada"], 0.01f, 2.0f)) return "Estação: chuva por basculada fora da faixa (0,01 a 2 mm)";
+  if (!decimal(estacao["chuvaEfetivaMinMm"], 0.0f, 20.0f)) return "Estação: chuva mínima fora da faixa (0 a 20 mm)";
+  if (!decimal(estacao["capacidadeSoloMm"], 5.0f, 300.0f)) return "Estação: capacidade do solo fora da faixa (5 a 300 mm)";
+  if (!estacao["latitude"].isNull() && !decimal(estacao["latitude"], -90.0f, 90.0f)) return "Estação: latitude fora da faixa (-90 a 90)";
+  if (!decimal(estacao["ajusteTempC"], -10.0f, 10.0f)) return "Estação: correção da temperatura fora da faixa (-10 a 10)";
+
+  JsonVariantConst registro = c["registro"];
+  if (!inteiro(registro["diasNoCartao"], 1, 60, n)) return "Registro: dias no cartão fora da faixa (1 a 60)";
+  if (!inteiro(registro["envioHoras"], 1, 168, n)) return "Registro: intervalo de envio fora da faixa (1 a 168 h)";
+  if (!registro["drive"].is<bool>() || !texto(registro["driveUrl"], 0, TAMANHO_URL - 1)) return "Registro: endereço do Apps Script longo demais";
+  if (registro["drive"].as<bool>() && strncmp(registro["driveUrl"].as<const char*>(), "https://", 8) != 0)
+    return "Registro: para enviar ao Drive, informe o endereço do Apps Script (começa com https://)";
 
   JsonVariantConst seguranca = c["seguranca"];
   if (!inteiro(seguranca["sessaoMin"], 5, 1440, n)) return "Segurança: tempo de sessão fora da faixa (5 a 1440 min)";
@@ -322,6 +349,11 @@ void lerAjustes(JsonVariantConst c, Ajustes& a) {
     a.controlador.tempoMaximoSetorS[i] = maxMin * 60UL;
     a.controlador.setorDesativado[i] = !(s["ativo"] | true);
     a.duracaoPadraoMin[i] = static_cast<uint16_t>(duracao);
+    a.setores[i].kc = s["kc"] | 1.0f;
+    a.setores[i].taxaMmH = s["taxaMmH"] | 2.5f;
+    a.setores[i].eficiencia = (s["eficienciaPct"] | 90.0f) / 100.0f;
+    a.setores[i].deficitMinMm = s["deficitMinMm"] | 3.0f;
+    a.setores[i].fator = s["fator"] | 1.0f;
     if (maxMin * 60UL > maior) maior = maxMin * 60UL;
   }
   a.controlador.tempoMaximoS = maior;
@@ -336,6 +368,17 @@ void lerAjustes(JsonVariantConst c, Ajustes& a) {
   if (a.mmPorBasculada < 0.01f || a.mmPorBasculada > 2.0f) a.mmPorBasculada = 0.2f;
   a.ajusteTempC = c["estacao"]["ajusteTempC"] | 0.0f;
   if (a.ajusteTempC < -10.0f || a.ajusteTempC > 10.0f) a.ajusteTempC = 0;
+  a.balancoHidrico = c["balancoHidrico"] | true;
+  a.adiarPorChuva = c["adiarPorChuva"] | true;
+  a.chuvaAdiarMm = c["chuvaAdiarMm"] | 5.0f;
+  a.latitude = c["estacao"]["latitude"].is<float>() ? c["estacao"]["latitude"].as<float>() : NAN;
+  a.solo.capacidadeMm = c["estacao"]["capacidadeSoloMm"] | 40.0f;
+  a.solo.chuvaEfetivaMinMm = c["estacao"]["chuvaEfetivaMinMm"] | 2.0f;
+  a.drive = c["registro"]["drive"] | false;
+  snprintf(a.driveUrl, sizeof(a.driveUrl), "%s", c["registro"]["driveUrl"] | "");
+  if (strncmp(a.driveUrl, "https://", 8) != 0) a.drive = false;
+  a.envioHoras = c["registro"]["envioHoras"] | 24;
+  if (a.envioHoras < 1) a.envioHoras = 1;
   a.diasNoCartao = c["registro"]["diasNoCartao"] | 7;
   if (a.diasNoCartao < 1) a.diasNoCartao = 1;
   if (a.diasNoCartao > 60) a.diasNoCartao = 60;

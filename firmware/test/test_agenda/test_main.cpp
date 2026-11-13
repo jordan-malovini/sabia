@@ -261,6 +261,64 @@ void test_proximo_inicio() {
   TEST_ASSERT_EQUAL((5 + 48 + 6) * 60, faltam);  // dia 15 às 06:00
 }
 
+// Decisor de mentira: adia quando mandado e corta o setor 1 pela metade e pula o 2.
+class DecisorFalso : public Decisor {
+ public:
+  bool adiar = false;
+  int consultas = 0;
+  bool adiarInicio() override { return adiar; }
+  uint32_t duracao(uint8_t setor, uint32_t programadaS) override {
+    consultas++;
+    return setor == 1 ? programadaS / 2 : 0;
+  }
+};
+
+void test_decisor_ajusta_o_tempo_de_cada_setor() {
+  SaidasSimples s; Controlador c(s, configRapida()); c.iniciar();
+  Agenda a(c); programaPadrao(a);
+  DecisorFalso d;
+  a.definirDecisor(&d);
+  a.tick(em(2026, 11, 12, 5, 59));
+  a.tick(em(2026, 11, 12, 6, 0));
+  TEST_ASSERT_EQUAL(2, d.consultas);
+  TEST_ASSERT_EQUAL(1, c.tamanhoFila());            // o setor 2 foi pulado
+  TEST_ASSERT_EQUAL(1, c.itemFila(0).setor);
+  TEST_ASSERT_EQUAL(30, c.itemFila(0).duracaoS);    // metade de 1 min
+}
+
+void test_decisor_adia_o_inicio_quando_choveu() {
+  SaidasSimples s; Controlador c(s, configRapida()); c.iniciar();
+  Agenda a(c); programaPadrao(a);
+  DecisorFalso d;
+  d.adiar = true;
+  a.definirDecisor(&d);
+  a.tick(em(2026, 11, 12, 5, 59));
+  a.tick(em(2026, 11, 12, 6, 0));
+  c.tick(relogioMs += 100);
+  TEST_ASSERT_FALSE(regando(c));
+  TEST_ASSERT_EQUAL(1, a.adiadosPeloClima());
+  TEST_ASSERT_EQUAL(0, a.puladosPorChuva());  // a pausa manual é contada à parte
+  d.adiar = false;                            // no dia seguinte já rega
+  a.tick(em(2026, 11, 13, 5, 59));
+  a.tick(em(2026, 11, 13, 6, 0));
+  c.tick(relogioMs += 100);
+  TEST_ASSERT_TRUE(regando(c));
+}
+
+// Iniciar na mão é uma ordem: o clima não encurta nem adia.
+void test_decisor_nao_vale_para_inicio_manual() {
+  SaidasSimples s; Controlador c(s, configRapida()); c.iniciar();
+  Agenda a(c); programaPadrao(a);
+  DecisorFalso d;
+  d.adiar = true;
+  a.definirDecisor(&d);
+  TEST_ASSERT_TRUE(a.iniciarPrograma(0));
+  TEST_ASSERT_EQUAL(0, d.consultas);
+  TEST_ASSERT_EQUAL(2, c.tamanhoFila());
+  TEST_ASSERT_EQUAL(60, c.itemFila(0).duracaoS);
+  TEST_ASSERT_EQUAL(60, c.itemFila(1).duracaoS);
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_calendario);
@@ -277,5 +335,8 @@ int main(int, char**) {
   RUN_TEST(test_programa_vazio_ou_inativo_nao_roda);
   RUN_TEST(test_ajuste_do_relogio_nao_dispara_atrasados);
   RUN_TEST(test_proximo_inicio);
+  RUN_TEST(test_decisor_ajusta_o_tempo_de_cada_setor);
+  RUN_TEST(test_decisor_adia_o_inicio_quando_choveu);
+  RUN_TEST(test_decisor_nao_vale_para_inicio_manual);
   return UNITY_END();
 }

@@ -64,9 +64,21 @@ struct Programa {
 
 bool diaPermitido(const Programa& p, uint32_t dias);
 
+// Quem decide, pelo clima, se um início automático acontece e por quanto
+// tempo cada setor rega (o balanço hídrico). Sem decisor, vale o programa.
+// Não vale para programas iniciados na mão.
+class Decisor {
+ public:
+  virtual ~Decisor() = default;
+  virtual bool adiarInicio() = 0;  // true: este início é pulado (choveu)
+  virtual uint32_t duracao(uint8_t setor, uint32_t programadaS) = 0;  // setor de 1 a 8
+};
+
 class Agenda {
  public:
   explicit Agenda(Controlador& controlador) : controlador_(controlador) {}
+
+  void definirDecisor(Decisor* decisor) { decisor_ = decisor; }
 
   Programa& programa(uint8_t i) { return programas_[i < NUM_PROGRAMAS ? i : 0]; }
   const Programa& programa(uint8_t i) const { return programas_[i < NUM_PROGRAMAS ? i : 0]; }
@@ -91,23 +103,26 @@ class Agenda {
   uint8_t pendentes() const { return nPendentes_; }
   void cancelarPendentes() { nPendentes_ = 0; }
   uint32_t puladosPorChuva() const { return puladosPorChuva_; }
+  uint32_t adiadosPeloClima() const { return adiadosPeloClima_; }  // inícios que o decisor pulou
 
   // Tempo total de um programa, já com o ajuste, em segundos.
   uint32_t duracaoTotalS(uint8_t i) const;
 
  private:
   void verificarMinuto(uint32_t minutoAbs);
-  void empilhar(uint8_t i);
+  void empilhar(uint8_t i, bool manual);
   void liberarPendente();
   uint32_t duracaoSetorS(const Programa& p, uint8_t setor) const;
 
   Controlador& controlador_;
+  Decisor* decisor_ = nullptr;
+  uint32_t adiadosPeloClima_ = 0;
   Programa programas_[NUM_PROGRAMAS];
   bool iniciada_ = false;
   uint32_t ultimoMinuto_ = 0;
   uint32_t suspensoAteDia_ = 0;
   uint32_t puladosPorChuva_ = 0;
-  uint8_t pendentes_[MAX_PENDENTES] = {};
+  uint8_t pendentes_[MAX_PENDENTES] = {};  // índice do programa; o bit 7 marca início na mão
   uint8_t nPendentes_ = 0;
 };
 

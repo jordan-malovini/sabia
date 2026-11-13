@@ -42,7 +42,6 @@ static ResumoDia resumos[MAX_RESUMOS];
 static uint8_t nResumos = 0;
 static char eventosPendentes[MAX_PENDENTES_BOOT][TAMANHO_EVENTO];
 static uint8_t nEventosPendentes = 0;
-static float (*et0DoDia)() = nullptr;
 
 static void caminhoDoDia(uint32_t dia, char saida[20]) {
   char data[11];
@@ -124,6 +123,8 @@ static void carregarResumos(uint32_t diaDeHoje) {
 static void apagarAntigos(uint32_t diaDeHoje) {
   if (arquivos == nullptr) return;
   uint32_t manter = ajustes.diasNoCartao < 1 ? 1 : ajustes.diasNoCartao;
+  // Com o envio ao Drive ligado, um dia só sai do cartão depois de confirmado (RF11).
+  uint32_t enviadoAte = ajustes.drive ? driveUltimoDiaEnviado() : UINT32_MAX;
   for (uint8_t passada = 0; passada < 4; passada++) {  // em passadas: não apaga enquanto lista
     char apagar[8][20];
     uint8_t n = 0;
@@ -137,7 +138,9 @@ static void apagarAntigos(uint32_t diaDeHoje) {
       uint32_t dia = 0;
       if (strlen(base) >= 8) {
         snprintf(data, sizeof(data), "%.4s-%.2s-%.2s", base, base + 4, base + 6);
-        if (diasDeData(data, dia) && dia + manter < diaDeHoje) snprintf(apagar[n++], 20, "/d/%s", base);
+        bool velho = diasDeData(data, dia) && dia + manter < diaDeHoje;
+        bool podeApagar = dia <= enviadoAte || dia + 60 < diaDeHoje;  // sem confirmação, espera até 60 dias
+        if (velho && podeApagar) snprintf(apagar[n++], 20, "/d/%s", base);
       }
       f.close();
     }
@@ -147,21 +150,44 @@ static void apagarAntigos(uint32_t diaDeHoje) {
   }
 }
 
+// Relê o arquivo de um dia para dentro de `registro`.
+static void relerDia(uint32_t dia, RegistroDia& registro) {
+  registro.iniciar(dia);
+  if (arquivos == nullptr) return;
+  char caminho[20], linha[TAMANHO_LINHA];
+  caminhoDoDia(dia, caminho);
+  File f = arquivos->open(caminho, FILE_READ);
+  if (!f) return;
+  while (lerLinha(f, linha, sizeof(linha))) registro.aplicarLinha(linha);
+  f.close();
+}
+
+// Ao ligar: se o controlador estava desligado na virada do dia, o último dia
+// registrado ficou sem resumo e sem entrar no balanço. Fecha agora.
+static void fecharDiaEsquecido(uint32_t diaDeHoje) {
+  uint32_t ultimo = memoria.getULong("regDia", 0);
+  if (ultimo == 0 || ultimo >= diaDeHoje) return;
+  static RegistroDia antigo;
+  relerDia(ultimo, antigo);
+  char linha[TAMANHO_LINHA];
+  formatarResumo(antigo.resumo(balancoFecharDia(antigo)), linha);
+  acrescentar(ARQUIVO_RESUMO, linha);
+  if (diaDeHoje - ultimo > 1) balancoDiasPerdidos();  // dias inteiros sem medir nada
+}
+
 static void abrirDia(uint32_t dia, uint16_t minuto) {
+  bool primeiraVez = !diaAberto;
+  if (primeiraVez) fecharDiaEsquecido(dia);
+  if (memoria.getULong("regDia", 0) != dia) memoria.putULong("regDia", dia);
   hoje.iniciar(dia);
   diaAberto = true;
   ultimoIntervalo = static_cast<uint8_t>(minuto / 10);
   ultimaHora = static_cast<uint8_t>(minuto / 60);
   horaClima = HoraClima();
   leiturasDaHora = 0;
-  if (arquivos != nullptr) {
-    char caminho[20], linha[TAMANHO_LINHA];
-    caminhoDoDia(dia, caminho);
-    File f = arquivos->open(caminho, FILE_READ);
-    if (f) {
-      while (lerLinha(f, linha, sizeof(linha))) hoje.aplicarLinha(linha);
-      f.close();
-    }
+  relerDia(dia, hoje);
+  if (primeiraVez) {  // a chuva de hoje, até agora, volta a contar para o adiamento
+    for (uint8_t h = 0; h <= minuto / 60 && h < 24; h++) balancoChuvaNaHora(dia * 24UL + h, hoje.chuvaHoraMm(h));
   }
   carregarResumos(dia);
   medirUso();
@@ -188,7 +214,7 @@ static void fecharDia() {
   fecharIntervalo();
   fecharHora();
   char linha[TAMANHO_LINHA];
-  formatarResumo(hoje.resumo(et0DoDia != nullptr ? et0DoDia() : NAN), linha);
+  formatarResumo(hoje.resumo(balancoFecharDia(hoje)), linha);
   acrescentar(ARQUIVO_RESUMO, linha);
 }
 
@@ -204,15 +230,16 @@ void registroIniciar() {
   Serial.printf("Registro: %s\r\n", noCartao ? "cartao SD" : arquivos != nullptr ? "sem cartao SD, gravando na memoria interna" : "sem onde gravar");
 }
 
-void registroAoFecharDia(float (*et0)()) { et0DoDia = et0; }
-
 void registroTick(const DadosTela& d, uint32_t pulsosChuva) {
   if (!pulsosSincronizados) {
     pulsosVistos = pulsosChuva;
     pulsosSincronizados = true;
   }
-  chuvaPendenteMm += (pulsosChuva - pulsosVistos) * ajustes.mmPorBasculada;
+  float choveuMm = (pulsosChuva - pulsosVistos) * ajustes.mmPorBasculada;
   pulsosVistos = pulsosChuva;
+  chuvaPendenteMm += choveuMm;
+  balancoTick(d);
+  if (choveuMm > 0) balancoChuva(choveuMm);
   if (!d.temHora) return;
 
   uint32_t dia = diasDesde2000(d.agora.ano, d.agora.mes, d.agora.dia);
@@ -249,6 +276,7 @@ void registrarRega(uint8_t setor, uint32_t segundos) {
   char linha[TAMANHO_LINHA];
   hoje.rega(ultimoMinuto, setor, segundos, linha);
   gravarNoDia(linha);
+  balancoRega(setor, segundos);
 }
 
 void registrarEvento(const char* texto) {
@@ -270,11 +298,34 @@ int registroUsoPct() { return usoPct; }
 
 bool registroHistorico(const char* periodo, JsonObject saida, const char* const nomes[NUM_SETORES]) {
   if (!diaAberto) return false;
-  float et0 = et0DoDia != nullptr ? et0DoDia() : NAN;
+  float et0 = balancoEt0Hoje();
   if (strcmp(periodo, "7d") == 0) historicoDiasParaJson(saida, 7, resumos, nResumos, hoje, et0, nomes);
   else if (strcmp(periodo, "30d") == 0) historicoDiasParaJson(saida, 30, resumos, nResumos, hoje, et0, nomes);
   else historicoHojeParaJson(saida, hoje, nomes);
   return true;
+}
+
+bool registroLerDia(uint32_t dia, String& conteudo, size_t limite) {
+  conteudo = "";
+  if (arquivos == nullptr) return false;
+  char caminho[20];
+  caminhoDoDia(dia, caminho);
+  File f = arquivos->open(caminho, FILE_READ);
+  if (!f) return false;
+  size_t tamanho = f.size();
+  if (tamanho == 0 || tamanho > limite || !conteudo.reserve(tamanho + 1)) {
+    f.close();
+    return false;
+  }
+  char bloco[257];
+  while (f.available()) {
+    size_t n = f.readBytes(bloco, sizeof(bloco) - 1);
+    if (n == 0) break;
+    bloco[n] = 0;
+    conteudo += bloco;
+  }
+  f.close();
+  return conteudo.length() > 0;
 }
 
 }  // namespace sabia

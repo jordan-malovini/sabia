@@ -532,6 +532,7 @@ void setup() {
   interfaceIniciar();
   sensoresIniciar();
   registroIniciar();  // pode levar alguns segundos na primeira vez (formata a memória)
+  balancoIniciar();
   registrarEvento(motivoDoReinicio());
 
   delay(200);

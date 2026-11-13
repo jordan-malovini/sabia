@@ -90,32 +90,35 @@ void Agenda::verificarMinuto(uint32_t minutoAbs) {
     for (uint8_t k = 0; k < INICIOS_POR_PROGRAMA; k++) {
       if (p.inicios[k] != minutoDoDia) continue;
       if (dia < suspensoAteDia_) puladosPorChuva_++;
-      else empilhar(i);
+      else if (decisor_ != nullptr && decisor_->adiarInicio()) adiadosPeloClima_++;
+      else empilhar(i, false);
       break;  // dois inícios iguais no mesmo programa contam uma vez
     }
   }
 }
 
-void Agenda::empilhar(uint8_t i) {
-  if (nPendentes_ < MAX_PENDENTES) pendentes_[nPendentes_++] = i;
+void Agenda::empilhar(uint8_t i, bool manual) {
+  if (nPendentes_ < MAX_PENDENTES) pendentes_[nPendentes_++] = static_cast<uint8_t>(i | (manual ? 0x80 : 0));
 }
 
 void Agenda::liberarPendente() {
   if (nPendentes_ == 0) return;
   if (controlador_.estado() != Estado::Ocioso || controlador_.tamanhoFila() != 0) return;
-  uint8_t i = pendentes_[0];
+  bool manual = (pendentes_[0] & 0x80) != 0;
+  uint8_t i = pendentes_[0] & 0x7F;
   for (uint8_t k = 1; k < nPendentes_; k++) pendentes_[k - 1] = pendentes_[k];
   nPendentes_--;
   const Programa& p = programas_[i];
   for (uint8_t s = 0; s < NUM_SETORES; s++) {
     uint32_t duracao = duracaoSetorS(p, s);
+    if (duracao > 0 && !manual && decisor_ != nullptr) duracao = decisor_->duracao(s + 1, duracao);
     if (duracao > 0) controlador_.pedir(s + 1, duracao);
   }
 }
 
 bool Agenda::iniciarPrograma(uint8_t i) {
   if (i >= NUM_PROGRAMAS || duracaoTotalS(i) == 0 || nPendentes_ >= MAX_PENDENTES) return false;
-  empilhar(i);
+  empilhar(i, true);
   liberarPendente();
   return true;
 }

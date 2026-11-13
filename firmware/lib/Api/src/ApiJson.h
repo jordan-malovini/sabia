@@ -14,6 +14,7 @@
 #include <ArduinoJson.h>
 
 #include "Agenda.h"
+#include "Balanco.h"
 #include "Controlador.h"
 #include "Registro.h"
 #include "Retomada.h"
@@ -22,6 +23,7 @@ namespace sabia {
 
 constexpr size_t TAMANHO_MAX_CORPO = 12288;  // maior corpo aceito num PUT/POST
 constexpr uint8_t SENHA_MIN = 6, SENHA_MAX = 64;
+constexpr size_t TAMANHO_URL = 201;
 
 // O que o firmware usa da configuração.
 struct Ajustes {
@@ -33,6 +35,21 @@ struct Ajustes {
   float mmPorBasculada = 0.2f;
   float ajusteTempC = 0;        // correção do termômetro
   uint16_t diasNoCartao = 7;    // quantos arquivos diários ficam guardados
+
+  // Balanço hídrico e adiamento por chuva
+  bool balancoHidrico = true;
+  bool adiarPorChuva = true;
+  float chuvaAdiarMm = 5.0f;    // chuva em 24 h que adia as regas automáticas
+  float latitude;               // NAN = não informada (sem ela não há ET0)
+  ParametrosSolo solo;
+  ParametrosSetor setores[NUM_SETORES];
+
+  // Envio ao Google Drive
+  bool drive = false;
+  char driveUrl[TAMANHO_URL] = "";
+  uint16_t envioHoras = 24;
+
+  Ajustes();
 };
 
 // "HH:MM" <-> minuto do dia.

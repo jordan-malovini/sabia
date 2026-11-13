@@ -53,7 +53,6 @@ const Leitura& sensoresLeitura();        // última leitura; NAN no que não há
 
 // Registro e histórico (registro.cpp).
 void registroIniciar();
-void registroAoFecharDia(float (*et0)());  // de onde vem a ET0 do dia, para o resumo
 void registroTick(const DadosTela& dados, uint32_t pulsosChuva);
 void registroLeitura(const Leitura& leitura);
 void registrarRega(uint8_t setor, uint32_t segundos);
@@ -65,6 +64,27 @@ bool registroTemArmazenamento();
 bool registroNoCartao();
 int registroUsoPct();                    // -1 se não deu para medir
 bool registroHistorico(const char* periodo, JsonObject saida, const char* const nomes[NUM_SETORES]);
+bool registroLerDia(uint32_t dia, String& conteudo, size_t limite);  // arquivo de um dia, para o Drive
+
+// Balanço hídrico e adiamento por chuva (balanco.cpp).
+void balancoIniciar();
+void balancoAplicarAjustes();
+void balancoTick(const DadosTela& dados);
+void balancoChuva(float mm);                       // chuva de agora
+void balancoChuvaNaHora(uint32_t horaAbsoluta, float mm);  // chuva antiga, ao reler o registro
+void balancoRega(uint8_t setor, uint32_t segundos);
+float balancoFecharDia(const RegistroDia& dia);    // devolve a ET0 do dia (NAN sem dados)
+void balancoDiasPerdidos();
+float balancoEt0Hoje();                            // estimativa com a máxima e a mínima até agora
+bool balancoConfiavel();
+uint8_t balancoSaldoPct(uint8_t setor);
+float balancoChuva24hMm();
+bool balancoAdiando();                             // choveu o bastante para adiar as regas automáticas
+
+// Envio ao Google Drive (drive.cpp). driveTick roda na tarefa web.
+void driveTick();
+uint32_t driveUltimoDiaEnviado();
+const char* driveUltimoErro();
 
 // Servidor web e Wi-Fi (web.cpp).
 void webIniciar();

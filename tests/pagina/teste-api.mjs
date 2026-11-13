@@ -35,8 +35,9 @@ const fake = {
       atual: this.atual, fila: this.fila,
       proximaRega: { programa: "A", hora: "06:00", quando: "hoje", faltamMin: 50 }, pausaChuvaDias: this.pausa,
       retomada: this.retomada,
-      clima: { chuvaHojeMm: 0.4, chuvaMesMm: null, tempC: null, tempMaxC: null, tempMinC: null, et0HojeMm: null },
-      setores: Array.from({ length: 8 }, () => ({ saldoPct: null, adiadoAte: null })),
+      clima: { chuvaHojeMm: 0.4, chuva24hMm: 6.2, chuvaMesMm: null, tempC: null, tempMaxC: null, tempMinC: null, et0HojeMm: null },
+      adiandoPorChuva: this.pausa === 0 && !this.retomada, balancoAtivo: false,
+      setores: Array.from({ length: 8 }, (_, i) => ({ saldoPct: i === 0 ? 62 : null, adiadoAte: null })),
     };
   },
 };
@@ -117,7 +118,7 @@ const texto = sel => ev(`document.querySelector(${JSON.stringify(sel)})?.textCon
 
 ok(await ev(`document.querySelector('#faixaDemo').classList.contains('oculto')`), "com controlador respondendo, não entra em demonstração");
 ok((await texto("#numeros")).includes("0,4") && (await texto("#numeros")).includes("–"), "chuva de hoje aparece e o que não tem sensor mostra traço");
-ok(!(await texto("#listaSetores")).includes("Água no solo"), "sem balanço hídrico, a barra de água no solo some");
+ok(await ev(`[...document.querySelectorAll('#listaSetores .setor')].filter(e=>e.textContent.includes('Água no solo')).length === 1`) && (await texto("#listaSetores")).includes("Água no solo 62%"), "água no solo só aparece no setor que tem saldo calculado");
 ok((await texto("#listaSetores")).includes("06:00 · prog. A · 25 min"), "próxima rega de cada setor sai da agenda");
 ok((await texto("#textoStatus")) === "Troque a senha", "avisa que a senha ainda é a de fábrica");
 await clicar('#chipStatus'); await espera(200);
@@ -134,6 +135,7 @@ ok((await texto("#chipSessao")) === "Sair", "senha certa abre a sessão");
 
 await clicar('[data-acao="cancelarRetomada"]'); await espera(3500);
 ok(fake.comandos.at(-1)?.acao === "cancelarRetomada" && (await texto("#destaque")).includes("Próxima: programa A, hoje às 06:00"), "retomada cancelada; mostra a próxima rega");
+ok((await texto("#destaque")).includes("Choveu 6,2 mm em 24 h"), "avisa quando a chuva está adiando as regas automáticas");
 
 await clicar('[data-ligar="2"]'); await espera(100);
 await ev(`document.querySelector('#dlgLigarMin').value=15`); await clicar('#dlgLigarOk'); await espera(3500);
