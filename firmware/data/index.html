@@ -671,7 +671,8 @@ function abrirStatus() {
   const linhas = [
     ["Wi-Fi", s.wifi ? `conectado · ${s.ip}` : "desconectado"],
     ["Rede própria (AP)", s.modoAp ? "ativa" : "desligada"],
-    ["Cartão SD", !s.cartaoSd ? "registro ainda não disponível" : s.cartaoSd.ok ? `ok · ${s.cartaoSd.usoPct}% usado` : "com problema"],
+    [s.cartaoSd?.naFlash ? "Registro" : "Cartão SD", !s.cartaoSd ? "não disponível" : !s.cartaoSd.ok ? "com problema: nada está sendo gravado"
+      : (s.cartaoSd.naFlash ? "sem cartão SD, gravando na memória interna" : "ok") + (s.cartaoSd.usoPct != null ? ` · ${s.cartaoSd.usoPct}% usado` : "")],
     ["Google Drive", s.drive.ativo ? `último envio ${s.drive.ultimoEnvio}` : "desativado"],
     ["Relógio (RTC)", s.rtc ? "ok" : "sem resposta"],
     ["Ligado há", `${dias} d ${horas} h`],
@@ -746,7 +747,7 @@ function desenharNumeros() {
     <p class="valor">${val} <span>${un}</span></p>${extra}</div>`;
   $("#numeros").innerHTML =
     card("Chuva hoje", num(c.chuvaHojeMm), "mm") +
-    card("Temperatura", num(c.tempC), "°C", `<p class="suave pequeno">máx ${num(c.tempMaxC, 0)}° · mín ${num(c.tempMinC, 0)}°</p>`) +
+    card("Temperatura", num(c.tempC), "°C", `<p class="suave pequeno">máx ${num(c.tempMaxC, 0)}° · mín ${num(c.tempMinC, 0)}°${c.umidadePct != null ? ` · umidade ${num(c.umidadePct, 0)}%` : ""}</p>`) +
     card("Chuva no mês", num(c.chuvaMesMm, 0), "mm") +
     card("Evaporação hoje", num(c.et0HojeMm), "mm", `<p class="suave pequeno">ET0 estimada</p>`);
 }
@@ -839,6 +840,7 @@ function confirmar(titulo, texto, rotulo, acao) {
    --------------------------------------------------------------------- */
 function graficoBarras(valores, rotulos, cor, opcoes = {}) {
   const L = 330, A = 150, base = 120, topo = 14;
+  valores = valores.map(v => v ?? 0);
   const max = Math.max(opcoes.minMax || 1, ...valores);
   const passo = L / valores.length, larg = Math.max(3, passo * 0.62);
   const cadaRot = Math.ceil(valores.length / 7);
@@ -855,7 +857,9 @@ function graficoBarras(valores, rotulos, cor, opcoes = {}) {
 
 function graficoLinhas(series, rotulos, opcoes = {}) {
   const L = 330, A = 150, base = 120, topo = 12;
-  const todos = series.flatMap(s => s.valores);
+  // Valores nulos (hora ou dia sem leitura) viram um buraco na linha.
+  const todos = series.flatMap(s => s.valores).filter(v => v != null);
+  if (!todos.length) return `<p class="suave pequeno">Sem leituras de temperatura neste período.</p>`;
   const min = Math.floor(Math.min(...todos) - 1), max = Math.ceil(Math.max(...todos) + 1);
   const passo = L / rotulos.length, y = v => base - ((v - min) / (max - min)) * (base - topo);
   const cadaRot = Math.ceil(rotulos.length / 7);
@@ -863,9 +867,15 @@ function graficoLinhas(series, rotulos, opcoes = {}) {
   s += `<line x1="0" y1="${base}" x2="${L}" y2="${base}" stroke="#CFC9B8"/>`;
   s += `<text x="2" y="${topo + 4}" font-size="10" fill="#55635B">${max}</text><text x="2" y="${base - 3}" font-size="10" fill="#55635B">${min}</text>`;
   for (const se of series) {
-    const pts = se.valores.map((v, i) => `${(i * passo + passo / 2).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-    s += `<polyline points="${pts}" fill="none" stroke="${se.cor}" stroke-width="2.5" stroke-linejoin="round"/>`;
-    if (se.valores.length <= 10) se.valores.forEach((v, i) => { s += `<circle cx="${(i * passo + passo / 2).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${se.cor}"><title>${esc(rotulos[i])}: ${num(v)}</title></circle>`; });
+    let trecho = [];
+    const fechar = () => {
+      if (trecho.length === 1) s += `<circle cx="${trecho[0].split(",")[0]}" cy="${trecho[0].split(",")[1]}" r="2.5" fill="${se.cor}"/>`;
+      else if (trecho.length) s += `<polyline points="${trecho.join(" ")}" fill="none" stroke="${se.cor}" stroke-width="2.5" stroke-linejoin="round"/>`;
+      trecho = [];
+    };
+    se.valores.forEach((v, i) => { if (v == null) fechar(); else trecho.push(`${(i * passo + passo / 2).toFixed(1)},${y(v).toFixed(1)}`); });
+    fechar();
+    if (se.valores.length <= 10) se.valores.forEach((v, i) => { if (v != null) s += `<circle cx="${(i * passo + passo / 2).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${se.cor}"><title>${esc(rotulos[i])}: ${num(v)}</title></circle>`; });
   }
   rotulos.forEach((r, i) => { if (i % cadaRot === 0 || i === rotulos.length - 1) s += `<text x="${(i * passo + passo / 2).toFixed(1)}" y="140" font-size="11" fill="#55635B" text-anchor="middle">${esc(r)}</text>`; });
   return s + "</svg>";
@@ -877,8 +887,7 @@ async function desenharHistorico() {
   let h;
   try { h = await api.historico(p); } catch { $("#graficos").innerHTML = `<p class="aviso erro">Não foi possível carregar o histórico.</p>`; return; }
   if (!h.rotulos.length) {
-    // O controlador ainda não grava o histórico (falta o registro no cartão SD).
-    $("#graficos").innerHTML = `<p class="aviso">Ainda não há histórico. Ele começa a ser gravado quando o registro no cartão SD estiver pronto.</p>`;
+    $("#graficos").innerHTML = `<p class="aviso">Ainda não há histórico. Sem o relógio (RTC) o controlador não sabe a data e não grava o registro.</p>`;
     $("#tabelaRegas").innerHTML = ""; $("#eventos").innerHTML = "";
     $$("[data-csv]").forEach(b => { b.disabled = true; });
     return;
@@ -898,7 +907,8 @@ async function desenharHistorico() {
   $("#graficos").innerHTML = html;
 
   $("#tabelaRegas").innerHTML = `<thead><tr><th>Setor</th><th class="num">Regas</th><th class="num">Tempo</th></tr></thead><tbody>` +
-    h.regas.map(r => `<tr><td>${esc(r.nome)}</td><td class="num">${r.vezes}</td><td class="num">${r.minutos} min</td></tr>`).join("") + "</tbody>";
+    (h.regas.length ? h.regas.map(r => `<tr><td>${esc(r.nome)}</td><td class="num">${r.vezes}</td><td class="num">${r.minutos} min</td></tr>`).join("")
+      : `<tr><td colspan="3" class="suave">Nenhuma rega neste período.</td></tr>`) + "</tbody>";
   $("#eventos").innerHTML = h.eventos.map(([t, txt]) => `<li><time>${esc(t)}</time><span>${esc(txt)}</span></li>`).join("");
 }
 

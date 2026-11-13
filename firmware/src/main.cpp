@@ -33,6 +33,9 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <driver/gpio.h>
+#include <esp_idf_version.h>
+#include <esp_system.h>
+#include <esp_task_wdt.h>
 
 #include "Agenda.h"
 #include "Controlador.h"
@@ -126,7 +129,9 @@ DadosTela sabia::lerDados() {
       pulsosInicioDoDia = pulsosChuva;
     }
   }
-  d.chuvaMm = (pulsosChuva - pulsosInicioDoDia) * ajustes.mmPorBasculada;
+  // Com relógio, a chuva de hoje vem do registro (que sobrevive a um reinício);
+  // sem relógio, é a contagem desde que o controlador ligou.
+  d.chuvaMm = d.temHora ? registroChuvaHojeMm() : (pulsosChuva - pulsosInicioDoDia) * ajustes.mmPorBasculada;
   return d;
 }
 
@@ -415,6 +420,7 @@ static void tratarComando(const String& linha) {
     int ano, mes, dia, hh, mm;
     if (temRtc && sscanf(linha.c_str(), "hora %d-%d-%d %d:%d", &ano, &mes, &dia, &hh, &mm) == 5) {
       rtc.adjust(DateTime(ano, mes, dia, hh, mm, 0));
+      registrarEvento("Hora acertada pelo serial");
       Serial.print("Relogio acertado\r\n> ");
     } else {
       Serial.print("Uso: hora 2026-11-12 19:55\r\n> ");
@@ -462,6 +468,46 @@ static void tratarComando(const String& linha) {
   Serial.print("> ");
 }
 
+// RF15: se o loop parar de rodar por 15 s, o watchdog reinicia o ESP. As saídas
+// voltam desligadas (RF14) e a rega segue pela retomada, depois da espera.
+constexpr uint32_t WATCHDOG_S = 15;
+
+static void iniciarWatchdog() {
+#if ESP_IDF_VERSION_MAJOR >= 5
+  esp_task_wdt_config_t config = {};
+  config.timeout_ms = WATCHDOG_S * 1000;
+  config.trigger_panic = true;
+  if (esp_task_wdt_reconfigure(&config) != ESP_OK) esp_task_wdt_init(&config);
+#else
+  esp_task_wdt_init(WATCHDOG_S, true);
+#endif
+  esp_task_wdt_add(nullptr);  // vigia a tarefa do loop
+}
+
+static const char* motivoDoReinicio() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "Controlador ligado";
+    case ESP_RST_SW: return "Controlador reiniciado";
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_INT_WDT:
+    case ESP_RST_WDT: return "Reiniciado pelo watchdog (o programa travou)";
+    case ESP_RST_PANIC: return "Reiniciado depois de um erro do programa";
+    case ESP_RST_BROWNOUT: return "Reiniciado por queda de tensao";
+    default: return "Controlador reiniciado";
+  }
+}
+
+// Registra cada rega quando o setor termina, com o tempo que ficou aberto.
+static void acompanharRegas(uint32_t agoraMs) {
+  static uint8_t setorAnterior = 0;
+  static uint32_t inicioMs = 0;
+  uint8_t setor = controlador.setorAtivo();
+  if (setor == setorAnterior) return;
+  if (setorAnterior != 0) registrarRega(setorAnterior, (agoraMs - inicioMs) / 1000UL);
+  setorAnterior = setor;
+  inicioMs = agoraMs;
+}
+
 void setup() {
   for (uint8_t pino : PINOS_SETORES) configurarSaidaSegura(pino);
   configurarSaidaSegura(PINO_BOMBA);
@@ -484,16 +530,23 @@ void setup() {
   carregarAgenda();
 
   interfaceIniciar();
+  sensoresIniciar();
+  registroIniciar();  // pode levar alguns segundos na primeira vez (formata a memória)
+  registrarEvento(motivoDoReinicio());
 
   delay(200);
   Serial.print("\r\nSABIA v" SABIA_VERSAO "\r\n");
   if (!temRtc) Serial.print("Aviso: relogio (RTC) nao encontrado\r\n");
   carregarPonto();
+  if (retomada.estado() == EstadoRetomada::Aguardando) registrarEvento("Energia voltou: rega esperando para retomar");
+  else if (retomada.estado() == EstadoRetomada::Descartada) registrarEvento("Energia voltou tarde demais: rega nao retomada");
   webIniciar();
   ajuda();
+  iniciarWatchdog();
 }
 
 void loop() {
+  esp_task_wdt_reset();
   if (reiniciarEmMs != 0 && static_cast<int32_t>(millis() - reiniciarEmMs) >= 0) {
     Serial.print("\r\nReiniciando...\r\n");
     Serial.flush();
@@ -523,7 +576,10 @@ void loop() {
   uint32_t agora = millis();
   Estado antes = controlador.estado();
   uint8_t setorAntes = controlador.setorAtivo();
-  if (retomada.tick(controlador, agora)) Serial.print("\r\nRetomando a rega interrompida\r\n");
+  if (retomada.tick(controlador, agora)) {
+    Serial.print("\r\nRetomando a rega interrompida\r\n");
+    registrarEvento("Rega interrompida retomada");
+  }
   controlador.tick(agora);
   if (controlador.estado() != antes || controlador.setorAtivo() != setorAntes) {
     Serial.print("\r\n");
@@ -531,6 +587,10 @@ void loop() {
     Serial.print("> ");
     Serial.print(linha);
   }
+
+  if (sensoresTick(agora)) registroLeitura(sensoresLeitura());
+  registroTick(lerDados(), pulsosChuva);
+  acompanharRegas(agora);
 
   DadosTela dados = lerDados();
   if (dados.temHora) agenda.tick(dados.agora);  // sem relógio, a agenda não roda
