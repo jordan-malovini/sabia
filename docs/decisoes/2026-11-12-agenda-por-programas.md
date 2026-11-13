@@ -47,8 +47,7 @@ O antigo guardava o horário do último ciclo iniciado como `hora × 100 + minut
 
 ## Ainda não feito
 
-- A página web (`firmware/data/index.html`) e o `docs/api.md` ainda descrevem horários por setor ("modo individual" e "modo ciclo"). Precisam passar para o modelo de programas.
 - Cycle and Soak, desvio do sensor de chuva por setor e ligar ou não a bomba por setor.
 - O ajuste percentual é manual. O balanço hídrico (#12) vai calculá-lo sozinho, como o Solar Sync faz nos Hunter.
 
-Feito depois (13 de novembro): edição dos programas pelo encoder e retomada após queda de energia (ver `2026-11-13-retomada-apos-queda-de-energia.md`).
+Feito depois (13 de novembro): edição dos programas pelo encoder e retomada após queda de energia (ver `2026-11-13-retomada-apos-queda-de-energia.md`); página web e `docs/api.md` no modelo de programas.

@@ -64,6 +64,16 @@ ok(await ev(`document.querySelector('#destaque').textContent.includes('Setor 2')
 await espera(2200);
 ok(await ev(`document.querySelector('#destaque .bomba:not(.desligada)')!==null`), "bomba liga depois do atraso");
 
+// iniciar um programa da agenda pelo painel
+await clicar('#btnPrograma'); await espera(150);
+ok(await ev(`document.querySelector('#dlgPrograma').open`), "Iniciar programa abre a lista");
+ok((await ev(`document.querySelectorAll('#listaProgramas [data-iniciar-prog]').length`)) === 3, "lista os programas A, B e C");
+ok(await ev(`document.querySelector('[data-iniciar-prog="2"]').disabled`), "programa sem setores fica desabilitado");
+ok((await ev(`document.querySelector('[data-iniciar-prog="0"]').textContent`)).includes("2h40"), "mostra o tempo total do programa A");
+await clicar('[data-iniciar-prog="1"]'); await espera(600);
+ok((await ev(`demo.fila.map(f=>f.setor).join(",")`)) === "1,3,5,7", "programa B põe os setores de gotejo na fila");
+ok((await ev(`demo.fila[0].duracaoS`)) === 35 * 60, "com o tempo do programa");
+
 // histórico
 await ev(`location.hash='historico'`); await espera(400);
 ok((await ev(`document.querySelectorAll('#graficos svg').length`)) === 2, "hoje: 2 gráficos");
@@ -76,28 +86,65 @@ ok((await ev(`document.querySelectorAll('#graficos svg rect').length`)) > 0, "30
 await ev(`location.hash='ajustes'`); await espera(400);
 ok(await ev(`document.querySelector('#avisoLeitura').classList.contains('oculto')`), "logado: sem aviso de leitura");
 ok(await ev(`!document.querySelector('[data-cfg="chuvaAdiarMm"]').disabled`), "campos habilitados");
-await clicar('[data-seg="modo"] [data-valor="ciclo"]'); await espera(100);
-ok(await ev(`document.querySelector('#blocoCiclo').style.display==='grid'`), "modo ciclo mostra o bloco do ciclo");
+const setar = (sel, val) => ev(`(()=>{const i=document.querySelector(${JSON.stringify(sel)}); i.value=${JSON.stringify(String(val))}; i.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+const texto = sel => ev(`document.querySelector(${JSON.stringify(sel)}).textContent`);
+const visivel = sel => ev(`getComputedStyle(document.querySelector(${JSON.stringify(sel)})).display !== 'none'`);
+
+// agenda por programas
+ok((await texto('[data-resumo-prog="0"]')) === "05:00 · todo dia · 2h40", "resumo do programa A: horário, dias e tempo total");
+ok((await texto('[data-resumo-prog="2"]')) === "desligado", "programa C desligado");
+ok((await visivel('[data-bloco-semana="0"]')) && !(await visivel('[data-bloco-intervalo="0"]')), "modo semana mostra os dias");
+await clicar('[data-seg="programas.0.modo"] [data-valor="intervalo"]'); await espera(100);
+ok(!(await visivel('[data-bloco-semana="0"]')) && (await visivel('[data-bloco-intervalo="0"]')), "modo intervalo mostra o campo de dias");
+ok((await texto('[data-resumo-prog="0"]')).includes("a cada 2 dias"), "resumo mostra o intervalo");
 ok(await ev(`!document.querySelector('#barraSalvar').classList.contains('oculto')`), "barra de salvar aparece");
-await clicar('[data-seg="modo"] [data-valor="individual"]'); await espera(100);
-// renomear o setor 3 e trocar o horário
-await ev(`(()=>{const i=document.querySelector('[data-cfg="setores.2.nome"]'); i.value='Horta'; i.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-// horário do setor 1 igual ao do setor 3 (20:00) -> conflito
-await ev(`(()=>{const i=document.querySelector('[data-horario="2.0"]'); i.value='20:10'; i.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-ok(await ev(`!document.querySelector('[data-conflito="0"]').classList.contains('oculto')`), "aviso de conflito entre setores no mesmo horário");
-ok((await ev(`document.querySelector('[data-conflito="0"]').textContent`)).includes("Horta"), "o aviso cita o setor certo");
-// duração acima do máximo bloqueia salvar
-await ev(`(()=>{const i=document.querySelector('[data-cfg="setores.0.duracaoMin"]'); i.value='100'; i.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+await clicar('[data-seg="programas.0.modo"] [data-valor="semana"]'); await espera(100);
+await clicar('[data-dias="programas.0.dias"] [data-i="0"]'); await espera(100);
+ok((await texto('[data-resumo-prog="0"]')).includes("seg, ter, qua, qui, sex, sáb"), "desmarcar o domingo muda o resumo");
+// segundo início antes de o primeiro terminar
+await setar('[data-cfg="programas.0.inicios.1"]', "06:00");
+ok((await texto('[data-aviso-prog="0"]')).includes("espera na fila"), "avisa quando um início chega antes de o anterior terminar");
+await setar('[data-cfg="programas.0.inicios.1"]', "17:00");
+ok(await ev(`document.querySelector('[data-aviso-prog="0"]').classList.contains('oculto')`), "sem aviso quando os inícios não se cruzam");
+// ajuste percentual
+await setar('[data-cfg="programas.1.ajustePct"]', 50);
+ok((await texto('[data-resumo-prog="1"]')).includes("1h10"), "ajuste de 50% corta o tempo total pela metade");
+// ligar o programa C
+await ev(`(()=>{const c=document.querySelector('[data-cfg="programas.2.ativo"]'); c.checked=true; c.dispatchEvent(new Event('input',{bubbles:true})); c.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ok((await texto('[data-aviso-prog="2"]')).includes("não tem horário"), "programa ligado sem horário gera aviso");
+await setar('[data-cfg="programas.2.inicios.0"]', "12:00");
+ok((await texto('[data-aviso-prog="2"]')).includes("nenhum setor"), "programa ligado sem setores gera aviso");
+await setar('[data-cfg="programas.2.minutos.0"]', 10);
+ok((await texto('[data-resumo-prog="2"]')) === "12:00 · todo dia · 10 min", "programa C configurado");
+// renomear o setor 3
+await setar('[data-cfg="setores.2.nome"]', "Horta");
+ok((await texto('[data-nome-setor-prog="2"]')) === "Horta", "o nome novo aparece nos tempos dos programas");
+// tempo do programa acima do máximo do setor bloqueia salvar
+await setar('[data-cfg="programas.2.minutos.0"]', 100);
 await clicar('#btnSalvar'); await espera(200);
-ok((await ev(`document.querySelector('#toast').textContent`)).includes("passa do tempo máximo"), "não salva duração acima do máximo");
-await ev(`(()=>{const i=document.querySelector('[data-cfg="setores.0.duracaoMin"]'); i.value='30'; i.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-await clicar('[data-add-horario="3"]'); await espera(100);
-ok((await ev(`estadoApp.rascunho.setores[3].horarios.length`)) === 2, "+ Horário adiciona");
+ok((await texto('#toast')).includes("passa do tempo máximo do setor"), "não salva tempo de programa acima do máximo do setor");
+await setar('[data-cfg="programas.2.minutos.0"]', 10);
+// duração padrão acima do máximo também bloqueia
+await setar('[data-cfg="setores.0.duracaoMin"]', 100);
+await clicar('#btnSalvar'); await espera(200);
+ok((await texto('#toast')).includes("passa do tempo máximo"), "não salva duração acima do máximo");
+await setar('[data-cfg="setores.0.duracaoMin"]', 30);
 await clicar('#btnSalvar'); await espera(300);
 ok((await ev(`document.querySelector('#toast').textContent`)) === "Ajustes salvos", "salvou");
 ok((await ev(`demo.config.setores[2].nome`)) === "Horta", "nome novo chegou na config");
+ok(await ev(`demo.config.programas[2].ativo === true && demo.config.programas[2].inicios[0] === "12:00" && demo.config.programas[2].minutos[0] === 10`), "programa C chegou na config");
+ok((await ev(`demo.config.programas[0].inicios[1]`)) === "17:00", "segundo início do programa A salvo");
+// pausa por chuva
+await setar('#diasPausa', 2);
+await clicar('#btnPausar'); await espera(1300);
+ok(await ev(`demo.pausaAte !== null`), "pausa por chuva enviada");
+ok((await texto('#textoPausa')).includes("em pausa por 2 dias"), "mostra os dias de pausa");
+await setar('#diasPausa', 0);
+await clicar('#btnPausar'); await espera(1300);
+ok(await ev(`demo.pausaAte === null`), "0 cancela a pausa");
 await ev(`location.hash='painel'`); await espera(1200);
 ok(await ev(`document.querySelector('#listaSetores').textContent.includes('Horta')`), "painel usa o nome novo");
+ok(await ev(`document.querySelector('#listaSetores').textContent.includes('prog.')`), "setores mostram a próxima rega pelo programa");
 
 // sair: campos travam
 await clicar('#chipSessao'); await espera(400);

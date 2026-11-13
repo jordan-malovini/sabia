@@ -150,10 +150,11 @@ details.grupo>summary small{font-weight:400;color:var(--suave);font-size:12px;ma
 .dias{display:flex;gap:4px}
 .dias button{flex:1;min-height:40px;border-radius:8px;border:1px solid var(--borda);background:#fff;font-size:13px}
 .dias button.ativo{background:var(--chip);border-color:var(--destaque);color:var(--destaque-escuro);font-weight:600}
-.horarios{display:flex;flex-wrap:wrap;gap:8px}
-.horarios .h{display:flex;align-items:center;gap:4px;border:1px solid var(--borda);border-radius:10px;padding:0 4px 0 8px;background:#fff}
-.horarios .h input{border:0;min-height:40px;width:auto;padding:0}
-.horarios .h button{border:0;background:none;width:32px;height:32px;font-size:18px;color:var(--suave)}
+.tempos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tempos label{display:flex;align-items:center;gap:8px;font-size:13px}
+.tempos label span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.campo .tempos input[type=number]{width:72px;flex:none}
+#listaProgramas{display:grid;gap:8px;margin-top:12px}
 .aviso{font-size:13px;padding:10px 12px;border-radius:10px;background:var(--alerta-fundo);color:var(--alerta)}
 .aviso.erro{background:var(--erro-fundo);color:var(--erro)}
 .subsetor{border:1px solid var(--trilho);border-radius:10px}
@@ -214,7 +215,7 @@ dialog .acoes-dialogo .btn{flex:1}
         <section class="numeros" id="numeros"></section>
         <div style="display:flex;justify-content:space-between;align-items:baseline">
           <h2 class="titulo-secao">Setores</h2>
-          <button class="btn contorno" id="btnCiclo" style="min-height:36px;padding:0 12px;font-size:13px">Iniciar ciclo</button>
+          <button class="btn contorno" id="btnPrograma" style="min-height:36px;padding:0 12px;font-size:13px">Iniciar programa</button>
         </div>
         <div class="setores" id="listaSetores"></div>
       </section>
@@ -282,6 +283,13 @@ dialog .acoes-dialogo .btn{flex:1}
   </div>
 </dialog>
 
+<dialog id="dlgPrograma">
+  <h2>Iniciar agora</h2>
+  <p class="suave pequeno">Os setores do programa entram na fila e regam em sequência, com a bomba ligada do começo ao fim.</p>
+  <div id="listaProgramas"></div>
+  <div class="acoes-dialogo"><button class="btn contorno" data-fechar>Cancelar</button></div>
+</dialog>
+
 <dialog id="dlgConfirmar">
   <h2 id="dlgConfirmarTitulo"></h2>
   <p class="suave" id="dlgConfirmarTexto"></p>
@@ -341,16 +349,25 @@ function configPadrao() {
     setores.push({
       nome: `Setor ${i}`, ativo: true, tipo: aspersao ? "aspersao" : "gotejo",
       duracaoMin: aspersao ? 40 : 35,
-      horarios: [aspersao ? ["04:00", "04:45", "05:30", "06:15"][i / 2 - 1] : ["20:00", "20:40", "21:20", "22:00"][(i - 1) / 2]], dias: [1, 1, 1, 1, 1, 1, 1],
       kc: 1.0, taxaMmH: aspersao ? 6 : 2.5, eficienciaPct: aspersao ? 80 : 90,
       deficitMinMm: aspersao ? 8 : 3, tempoMaxMin: aspersao ? 90 : 60,
       janela: aspersao ? ["04:00", "08:00"] : ["00:00", "23:59"], fator: 1.0,
     });
   }
   return {
-    modo: "individual", balancoHidrico: true, adiarPorChuva: true, chuvaAdiarMm: 5,
-    ciclo: { inicio: "05:30", dias: [1, 1, 1, 1, 1, 1, 1] },
-    bomba: { usar: true, atrasoLigarS: 2, atrasoFecharS: 1, pausaEntreSetoresS: 3 },
+    // Agenda: 3 programas, como nos controladores comerciais. No exemplo, o A
+    // rega a aspersão de madrugada e o B rega o gotejo à noite.
+    programas: [
+      { ativo: true, inicios: ["05:00", null, null, null], modo: "semana", dias: [1, 1, 1, 1, 1, 1, 1], intervaloDias: 2, inicioIntervalo: null,
+        minutos: setores.map(s => (s.tipo === "aspersao" ? 40 : 0)), ajustePct: 100 },
+      { ativo: true, inicios: ["20:00", null, null, null], modo: "semana", dias: [1, 1, 1, 1, 1, 1, 1], intervaloDias: 2, inicioIntervalo: null,
+        minutos: setores.map(s => (s.tipo === "gotejo" ? 35 : 0)), ajustePct: 100 },
+      { ativo: false, inicios: [null, null, null, null], modo: "semana", dias: [1, 1, 1, 1, 1, 1, 1], intervaloDias: 2, inicioIntervalo: null,
+        minutos: [0, 0, 0, 0, 0, 0, 0, 0], ajustePct: 100 },
+    ],
+    retomada: { ativa: true, esperaMin: 10, limiteMin: 120 },
+    balancoHidrico: true, adiarPorChuva: true, chuvaAdiarMm: 5,
+    bomba: { usar: true, atrasoLigarS: 2, atrasoFecharS: 1, sobreposicaoS: 2, pausaEntreSetoresS: 3 },
     setores,
     estacao: { mmPorBasculada: 0.2, chuvaEfetivaMinMm: 2, capacidadeSoloMm: 40, latitude: null, ajusteTempC: 0 },
     relogio: { ntp: true, fuso: "America/Sao_Paulo" },
@@ -362,18 +379,70 @@ function configPadrao() {
 }
 
 /* ---------------------------------------------------------------------
+   Agenda: contas usadas no resumo dos programas e no modo demonstração
+   --------------------------------------------------------------------- */
+const LETRAS = ["A", "B", "C"];
+const fmtMin = m => (m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`);
+// Como no firmware: o ajuste é aplicado em segundos, sem arredondar setor por setor.
+const segundosSetor = (p, s) => Math.floor((p.minutos[s] || 0) * 60 * (p.ajustePct || 100) / 100);
+const minutosSetor = (p, s) => Math.round(segundosSetor(p, s) / 60);
+const duracaoProgramaMin = p => Math.round(p.minutos.reduce((t, _, s) => t + segundosSetor(p, s), 0) / 60);
+const meiaNoite = (d, mais = 0) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + mais);
+
+function diaPermitido(p, dia) {
+  if (p.modo === "impares") return dia.getDate() % 2 === 1;
+  if (p.modo === "pares") return dia.getDate() % 2 === 0;
+  if (p.modo === "intervalo") {
+    const ref = p.inicioIntervalo ? new Date(p.inicioIntervalo + "T00:00") : new Date(2026, 0, 1);
+    const dias = Math.round((meiaNoite(dia) - ref) / 86400000);
+    return dias >= 0 && dias % Math.max(1, p.intervaloDias || 1) === 0;
+  }
+  return !!p.dias[dia.getDay()];
+}
+
+function textoDias(p) {
+  if (p.modo === "impares") return "dias ímpares";
+  if (p.modo === "pares") return "dias pares";
+  if (p.modo === "intervalo") return (p.intervaloDias || 1) <= 1 ? "todo dia" : `a cada ${p.intervaloDias} dias`;
+  const ativos = DIAS_NOME.filter((_, k) => p.dias[k]);
+  return ativos.length === 7 ? "todo dia" : ativos.length ? ativos.join(", ") : "nenhum dia";
+}
+
+// Próximo início da agenda. Com `setor` (0 a 7), só conta programas que regam esse setor.
+function proximoInicio(cfg, agora, setor = null, pausaAte = null) {
+  let melhor = null;
+  for (let d = 0; d <= 31 && !melhor; d++) {
+    const dia = meiaNoite(agora, d);
+    if (pausaAte && dia < pausaAte) continue;
+    cfg.programas.forEach((p, i) => {
+      if (!p.ativo || !diaPermitido(p, dia)) return;
+      if (setor == null ? duracaoProgramaMin(p) <= 0 : segundosSetor(p, setor) <= 0) return;
+      p.inicios.forEach(h => {
+        if (!h) return;
+        const [hh, mm] = h.split(":").map(Number);
+        const quando = new Date(dia); quando.setHours(hh, mm, 0, 0);
+        if (quando > agora && (!melhor || quando < melhor.quando)) melhor = { programa: i, hora: h, quando, dias: d };
+      });
+    });
+  }
+  return melhor;
+}
+const rotuloDia = d => (d === 0 ? "hoje" : d === 1 ? "amanhã" : `em ${d} dias`);
+
+/* ---------------------------------------------------------------------
    Modo demonstração: simula o controlador no navegador
    --------------------------------------------------------------------- */
 const demo = {
   config: configPadrao(),
   t0: Date.now(),
-  atual: { setor: 4, fase: "regando", restanteS: 12 * 60, duracaoS: 40 * 60, origem: "ciclo" },
+  atual: { setor: 4, fase: "regando", restanteS: 12 * 60, duracaoS: 40 * 60, origem: "programa A" },
+  pausaAte: null,
   fila: [{ setor: 5, duracaoS: 30 * 60 }, { setor: 6, duracaoS: 40 * 60 }, { setor: 7, duracaoS: 35 * 60 }, { setor: 8, duracaoS: 40 * 60 }],
   saldo: [62, 38, 80, 15, 71, 45, 55, 28],
   adiado: { 3: "amanhã, 20:00" },
   logado: false,
   eventos: [
-    ["sáb 14:20", "Setor 4 iniciou (ciclo, 40 min)"],
+    ["sáb 14:20", "Setor 4 iniciou (programa A, 40 min)"],
     ["sáb 13:05", "Chuva começou"],
     ["sáb 06:10", "Setor 3 adiado por chuva (12 mm em 24 h)"],
     ["sex 20:35", "Setor 1 terminou (35 min)"],
@@ -397,22 +466,26 @@ const demo = {
     const agora = new Date();
     const a = this.atual;
     const pendente = a ? [a.setor] : [];
+    const prox = proximoInicio(this.config, agora, null, this.pausaAte);
     return {
-      versao: "0.1-demo", hora: agora.toISOString(),
+      versao: "0.4-demo", hora: agora.toISOString(),
       sistema: { wifi: true, ip: "192.168.0.50", modoAp: false, cartaoSd: { ok: true, usoPct: 12 },
         drive: { ativo: this.config.registro.drive, ultimoEnvio: "ontem, 23:00" }, rtc: true, ligadoHa: Math.round((Date.now() - this.t0) / 1000) + 86400 * 3 },
       sessao: { logado: this.logado },
-      modo: this.config.modo,
       atual: a ? { setor: a.setor, fase: a.fase, restanteS: a.restanteS, duracaoS: a.duracaoS, bomba: a.fase === "regando", origem: a.origem } : null,
       fila: this.fila.map(p => ({ ...p })),
-      proximaRega: { setor: 5, hora: "20:00" },
+      proximaRega: prox ? { programa: LETRAS[prox.programa], hora: prox.hora, quando: rotuloDia(prox.dias) } : null,
+      pausaChuvaDias: this.pausaAte && this.pausaAte > agora ? Math.ceil((this.pausaAte - meiaNoite(agora)) / 86400000) : 0,
       clima: { chuvaHojeMm: 4.2, chuvaMesMm: 86, tempC: 27.5, tempMaxC: 31.2, tempMinC: 21.4, et0HojeMm: 4.6 },
-      setores: this.config.setores.map((s, i) => ({
+      setores: this.config.setores.map((s, i) => {
+        const px = proximoInicio(this.config, agora, i, this.pausaAte);
+        return {
         saldoPct: this.saldo[i],
-        proxima: this.adiado[i + 1] ? null : `${s.horarios[0] || "–"} · ${s.duracaoMin} min`,
+        proxima: this.adiado[i + 1] || !px ? null
+          : `${rotuloDia(px.dias)} ${px.hora} · prog. ${LETRAS[px.programa]} · ${minutosSetor(this.config.programas[px.programa], i)} min`,
         adiadoAte: this.adiado[i + 1] || null,
         pendente: pendente.includes(i + 1),
-      })),
+      }; }),
     };
   },
   comando(c) {
@@ -436,6 +509,16 @@ const demo = {
         if (s.ativo && !(this.atual && this.atual.setor === n) && !this.fila.some(p => p.setor === n)) this.fila.push({ setor: n, duracaoS: s.duracaoMin * 60 });
       });
       if (!this.atual) this.tick();
+    } else if (c.acao === "programa") {
+      const p = this.config.programas[c.programa];
+      if (!p || duracaoProgramaMin(p) <= 0) throw new Error("Programa sem setores");
+      p.minutos.forEach((_, i) => {
+        const n = i + 1, seg = segundosSetor(p, i);
+        if (seg > 0 && !(this.atual && this.atual.setor === n) && !this.fila.some(f => f.setor === n)) this.fila.push({ setor: n, duracaoS: seg });
+      });
+      if (!this.atual) this.tick();
+    } else if (c.acao === "chuva") {
+      this.pausaAte = c.dias > 0 ? meiaNoite(new Date(), Math.min(14, c.dias)) : null;
     }
     return { ok: true };
   },
@@ -604,7 +687,7 @@ function abrirEntrar() {
 /* ---------------------------------------------------------------------
    Painel
    --------------------------------------------------------------------- */
-const FASES = { abrindo: "Abrindo válvula", regando: "Regando agora", fechando: "Fechando válvula", pausa: "Pausa entre setores" };
+const FASES = { abrindo: "Abrindo válvula", regando: "Regando agora", fechando: "Fechando válvula", pausa: "Pausa entre setores", trocando: "Trocando de setor" };
 const nomeSetor = n => (estadoApp.config?.setores[n - 1]?.nome) || `Setor ${n}`;
 const tipoSetor = n => (estadoApp.config?.setores[n - 1]?.tipo === "aspersao" ? "Aspersão" : "Gotejo");
 
@@ -615,8 +698,8 @@ function desenharDestaque() {
     el.className = "destaque parado";
     const p = e.proximaRega;
     el.innerHTML = `<div class="info"><p class="suave pequeno">Nada regando</p>
-      <p style="font-size:20px;font-weight:600;margin-top:2px">${p ? `Próxima: ${esc(nomeSetor(p.setor))} às ${esc(p.hora)}` : "Nenhuma rega agendada"}</p>
-      <p class="suave pequeno" style="margin-top:4px">Modo ${e.modo === "ciclo" ? "ciclo" : "individual"}</p></div>`;
+      <p style="font-size:20px;font-weight:600;margin-top:2px">${p ? `Próxima: programa ${esc(p.programa)}, ${esc(p.quando)} às ${esc(p.hora)}` : "Nenhuma rega agendada"}</p>
+      ${e.pausaChuvaDias ? `<p class="suave pequeno" style="margin-top:4px">Regas em pausa por chuva: ${e.pausaChuvaDias} ${e.pausaChuvaDias === 1 ? "dia" : "dias"}</p>` : ""}</div>`;
     return;
   }
   const a = e.atual;
@@ -628,7 +711,7 @@ function desenharDestaque() {
     : `<div class="fila"><span style="opacity:.8">Fila vazia</span></div>`;
   el.innerHTML = `
     <div class="info">
-      <p class="pequeno">${FASES[a.fase] || a.fase}${a.origem === "ciclo" ? " · ciclo" : ""}</p>
+      <p class="pequeno">${FASES[a.fase] || a.fase}${a.origem && a.origem !== "manual" && a.origem !== "fila" ? " · " + esc(a.origem) : ""}</p>
       <p style="font-size:20px;font-weight:600;margin:2px 0 8px">${esc(nomeSetor(a.setor))} · ${tipoSetor(a.setor)}</p>
       <div class="barra" role="progressbar" aria-valuenow="${feito}" aria-valuemin="0" aria-valuemax="100"><div style="width:${feito}%"></div></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px;flex-wrap:wrap">
@@ -671,7 +754,7 @@ function desenharSetores() {
     const n = i + 1, info = e.setores[i];
     const regando = e.atual && e.atual.setor === n;
     const naFila = e.fila.some(p => p.setor === n);
-    let situacao = info.adiadoAte ? `Rega adiada por chuva até ${esc(info.adiadoAte)}` : `Próxima rega ${esc(info.proxima || "–")}`;
+    let situacao = info.adiadoAte ? `Rega adiada por chuva até ${esc(info.adiadoAte)}` : info.proxima ? `Próxima: ${esc(info.proxima)}` : "Fora da agenda";
     if (!s.ativo) situacao = "Desativado";
     if (naFila) situacao = "Na fila";
     if (regando) situacao = `${FASES[e.atual.fase]} · faltam ${minutos(e.atual.restanteS)} min`;
@@ -713,6 +796,14 @@ function abrirLigar(n) {
     enviar({ acao: "ligar", setor: n, minutos: m }, ocupado ? `${s.nome} na fila` : `${s.nome} ligando`);
   };
   $("#dlgLigar").showModal();
+}
+
+function abrirProgramas() {
+  $("#listaProgramas").innerHTML = estadoApp.config.programas.map((p, i) => {
+    const total = duracaoProgramaMin(p);
+    return `<button class="btn contorno" data-iniciar-prog="${i}" ${total ? "" : "disabled"}>Programa ${LETRAS[i]} · ${total ? fmtMin(total) : "sem setores"}</button>`;
+  }).join("") + `<button class="btn contorno" data-iniciar-ciclo>Ciclo de teste · todos os setores</button>`;
+  $("#dlgPrograma").showModal();
 }
 
 function confirmar(titulo, texto, rotulo, acao) {
@@ -819,11 +910,7 @@ function htmlSetor(i) {
     ${campoInterruptor(`${p}.ativo`, "Setor ativo")}
     ${campoTexto(`${p}.nome`, "Nome", "text", "", 'maxlength="20"')}
     ${campoSegmentado(`${p}.tipo`, "Tipo de rega", [["gotejo", "Gotejo"], ["aspersao", "Aspersão"]])}
-    <div class="campo"><span class="rotulo">Horários (modo individual)</span><div class="horarios" data-horarios="${i}"></div>
-      <button type="button" class="btn contorno" data-add-horario="${i}" style="min-height:40px">+ Horário</button>
-      <p class="aviso oculto" data-conflito="${i}"></p></div>
-    ${campoDias(`${p}.dias`)}
-    ${campoNumero(`${p}.duracaoMin`, "Duração padrão", "min", 'min="1" max="240" step="1"', "Usada na agenda, no ciclo e ao ligar na mão. Com o balanço hídrico ligado, o tempo é ajustado pelo déficit.")}
+    ${campoNumero(`${p}.duracaoMin`, "Duração padrão", "min", 'min="1" max="240" step="1"', "Sugerida ao ligar o setor na mão e usada no ciclo de teste. Os tempos da agenda ficam em cada programa.")}
     ${campoNumero(`${p}.tempoMaxMin`, "Tempo máximo por rega", "min", 'min="1" max="240" step="1"', "Nenhuma rega deste setor passa disso.")}
     <div class="duas">
       <div class="campo"><label>Janela: início</label><input type="time" data-cfg="${p}.janela.0"></div>
@@ -840,24 +927,49 @@ function htmlSetor(i) {
   </div></details>`;
 }
 
+function htmlPrograma(i) {
+  const p = `programas.${i}`;
+  return `<details class="subsetor" data-prog-det="${i}"><summary><span><b>Programa ${LETRAS[i]}</b> <span class="suave pequeno" data-resumo-prog="${i}"></span></span><span class="suave">›</span></summary>
+  <div class="campos">
+    ${campoInterruptor(`${p}.ativo`, "Programa ligado")}
+    <div class="campo"><span class="rotulo">Horários de início</span>
+      <div class="duas">${[0, 1, 2, 3].map(k => `<input type="time" data-cfg="${p}.inicios.${k}" aria-label="Início ${k + 1}">`).join("")}</div>
+      <p class="ajuda">Até 4 por dia. Deixe em branco os que não usar.</p></div>
+    ${campoSegmentado(`${p}.modo`, "Dias de rega", [["semana", "Semana"], ["impares", "Ímpares"], ["pares", "Pares"], ["intervalo", "Intervalo"]])}
+    <div data-bloco-semana="${i}">${campoDias(`${p}.dias`)}</div>
+    <div data-bloco-intervalo="${i}">${campoNumero(`${p}.intervaloDias`, "Regar a cada", "dias", 'min="1" max="30" step="1"', "1 é todo dia e 2 é dia sim, dia não. A contagem começa no dia em que você salvar.")}</div>
+    <div class="campo"><span class="rotulo">Tempo de cada setor (min)</span>
+      <div class="tempos">${[0, 1, 2, 3, 4, 5, 6, 7].map(st => `<label><span data-nome-setor-prog="${st}"></span><input type="number" data-cfg="${p}.minutos.${st}" min="0" max="180" step="1" inputmode="numeric"></label>`).join("")}</div>
+      <p class="ajuda">0 deixa o setor fora deste programa.</p></div>
+    ${campoNumero(`${p}.ajustePct`, "Ajuste dos tempos", "%", 'min="5" max="200" step="5"', "100% é o tempo normal. Use menos na época de chuva e mais na seca.")}
+    <p class="aviso oculto" data-aviso-prog="${i}"></p>
+  </div></details>`;
+}
+
 function htmlAjustes() {
   return [
-    grupo("Modo de operação", "como o controlador decide regar", `
-      ${campoSegmentado("modo", "Modo", [["individual", "Individual"], ["ciclo", "Ciclo"]])}
-      <p class="ajuda" id="ajudaModo"></p>
-      <div id="blocoCiclo" style="display:grid;gap:14px">
-        ${campoTexto("ciclo.inicio", "Início do ciclo", "time")}
-        ${campoDias("ciclo.dias", "Dias do ciclo")}
-      </div>
+    grupo("Agenda", "programas A, B e C", `
+      <p class="ajuda">Cada programa tem os próprios horários, dias e tempos. Quando um horário chega, os setores do programa regam em sequência, com a bomba ligada do começo ao fim. Se dois programas coincidirem, o segundo espera o primeiro terminar.</p>
+      ${[0, 1, 2].map(htmlPrograma).join("")}
+      <div class="campo"><span class="rotulo">Pausa por chuva</span>
+        <div class="unidade"><input type="number" id="diasPausa" min="0" max="14" step="1" value="1" inputmode="numeric" aria-label="Dias de pausa"><span>dias</span>
+          <button type="button" class="btn contorno" id="btnPausar">Pausar</button></div>
+        <p class="ajuda" id="textoPausa">Nenhum programa começa durante a pausa. Ela termina sozinha. Use 0 para cancelar.</p></div>`, true),
+    grupo("Setores", "nomes e parâmetros", Array.from({ length: 8 }, (_, i) => htmlSetor(i)).join("")),
+    grupo("Ajuste pelo clima", "balanço hídrico e chuva", `
       ${campoInterruptor("balancoHidrico", "Ajustar o tempo pelo balanço hídrico", "Rega mais quando a evaporação está alta e menos quando há água no solo.")}
       ${campoInterruptor("adiarPorChuva", "Adiar a rega depois de chuva")}
-      ${campoNumero("chuvaAdiarMm", "Chuva que adia a rega", "mm em 24 h", 'min="0" max="100" step="0.5"')}`, true),
-    grupo("Setores", "nomes, horários e parâmetros", Array.from({ length: 8 }, (_, i) => htmlSetor(i)).join("")),
+      ${campoNumero("chuvaAdiarMm", "Chuva que adia a rega", "mm em 24 h", 'min="0" max="100" step="0.5"')}`),
+    grupo("Queda de energia", "retomar a rega", `
+      ${campoInterruptor("retomada.ativa", "Retomar a rega quando a energia voltar", "O controlador guarda o setor, o tempo que falta e a fila.")}
+      ${campoNumero("retomada.esperaMin", "Esperar antes de retomar", "min", 'min="1" max="60" step="1"', "Tudo fica desligado nesse tempo, para a rede estabilizar e a bomba não ligar e desligar.")}
+      ${campoNumero("retomada.limiteMin", "Não retomar se a energia ficou fora por mais de", "min", 'min="10" max="720" step="10"', "Evita regar fora de hora por causa de uma queda antiga.")}`),
     grupo("Bomba e sequência", "tempos de segurança", `
       ${campoInterruptor("bomba.usar", "Usar bomba", "Desligue se a água vem por gravidade ou da rede.")}
       ${campoNumero("bomba.atrasoLigarS", "Bomba liga depois de a válvula abrir", "s", 'min="0" max="30" step="1"')}
       ${campoNumero("bomba.atrasoFecharS", "Válvula fecha depois de a bomba desligar", "s", 'min="0" max="30" step="1"')}
-      ${campoNumero("bomba.pausaEntreSetoresS", "Pausa entre setores", "s", 'min="0" max="120" step="1"')}`),
+      ${campoNumero("bomba.sobreposicaoS", "Troca de setor: as duas válvulas abertas por", "s", 'min="0" max="30" step="1"', "A bomba fica ligada durante a troca.")}
+      ${campoNumero("bomba.pausaEntreSetoresS", "Pausa antes de religar a bomba", "s", 'min="0" max="120" step="1"')}`),
     grupo("Estação meteorológica", "calibração e solo", `
       ${campoNumero("estacao.mmPorBasculada", "Chuva por basculada", "mm", 'min="0.01" max="2" step="0.01"', "Valor da calibração com seringa.")}
       ${campoNumero("estacao.chuvaEfetivaMinMm", "Chuva mínima que conta", "mm", 'min="0" max="20" step="0.5"', "Chuvas menores que isso não entram no saldo.")}
@@ -911,37 +1023,40 @@ function preencherAjustes() {
   $$("[data-dias]", raiz).forEach(el => { const v = obter(r, el.dataset.dias); $$("button", el).forEach(b => b.classList.toggle("ativo", !!v[b.dataset.i])); });
   r.setores.forEach((s, i) => {
     $(`[data-nome-setor="${i}"]`).textContent = s.nome;
-    $(`[data-resumo-setor="${i}"]`).textContent = s.ativo ? `${s.tipo === "aspersao" ? "aspersão" : "gotejo"} · ${s.horarios.join(", ") || "sem horário"} · ${s.duracaoMin} min` : "desativado";
-    $(`[data-horarios="${i}"]`).innerHTML = s.horarios.map((h, k) =>
-      `<span class="h"><input type="time" value="${h}" data-horario="${i}.${k}" aria-label="Horário ${k + 1}"><button type="button" data-del-horario="${i}.${k}" aria-label="Remover horário">×</button></span>`).join("");
+    $(`[data-resumo-setor="${i}"]`).textContent = s.ativo ? `${s.tipo === "aspersao" ? "aspersão" : "gotejo"} · ${s.duracaoMin} min` : "desativado";
   });
-  const ciclo = r.modo === "ciclo";
-  $("#blocoCiclo").style.display = ciclo ? "grid" : "none";
-  $("#ajudaModo").textContent = ciclo
-    ? "Todos os setores ativos regam em sequência, a partir do horário de início, cada um pela sua duração."
-    : "Cada setor rega nos próprios horários. Se dois coincidirem, o segundo entra na fila.";
-  verificarConflitos();
+  resumirProgramas();
   const e = estadoApp.estado;
+  if (e) $("#textoPausa").textContent = e.pausaChuvaDias
+    ? `Regas em pausa por ${e.pausaChuvaDias} ${e.pausaChuvaDias === 1 ? "dia" : "dias"}. Use 0 para cancelar.`
+    : "Nenhum programa começa durante a pausa. Ela termina sozinha. Use 0 para cancelar.";
   if (e) $("#infoSistema").innerHTML = `<div><span class="suave">Firmware</span><span>${esc(e.versao)}</span></div><div><span class="suave">Endereço</span><span>${esc(e.sistema.ip)}</span></div>`;
   const leitura = !estadoApp.logado;
   $("#avisoLeitura").classList.toggle("oculto", !leitura);
   $$("input,select,button:not(summary)", raiz).forEach(el => { if (!el.closest("summary")) el.disabled = leitura; });
 }
 
-// Horários sobrepostos no modo individual (mesmo dia, intervalos que se cruzam).
-function verificarConflitos() {
+// Resumo de cada programa (horários, dias, tempo total) e avisos.
+function resumirProgramas() {
   const r = estadoApp.rascunho;
-  const regas = [];
-  r.setores.forEach((s, i) => { if (s.ativo) s.horarios.forEach(h => { const [hh, mm] = h.split(":").map(Number); regas.push({ i, ini: hh * 60 + mm, fim: hh * 60 + mm + s.duracaoMin, dias: s.dias }); }); });
-  r.setores.forEach((_, i) => {
-    const conflitos = new Set();
-    regas.filter(a => a.i === i).forEach(a => regas.forEach(b => {
-      if (b.i !== i && a.dias.some((d, k) => d && b.dias[k]) && a.ini < b.fim && b.ini < a.fim) conflitos.add(b.i + 1);
-    }));
-    const el = $(`[data-conflito="${i}"]`);
-    if (!el) return;
-    el.classList.toggle("oculto", conflitos.size === 0 || r.modo !== "individual");
-    el.textContent = conflitos.size ? `Coincide com ${[...conflitos].map(n => r.setores[n - 1].nome).join(", ")}. Não é erro: um espera o outro na fila, mas a rega vai atrasar.` : "";
+  $$("[data-nome-setor-prog]").forEach(el => { el.textContent = r.setores[el.dataset.nomeSetorProg].nome || `Setor ${Number(el.dataset.nomeSetorProg) + 1}`; });
+  r.programas.forEach((p, i) => {
+    const total = duracaoProgramaMin(p), inicios = p.inicios.filter(Boolean).sort();
+    $(`[data-resumo-prog="${i}"]`).textContent = p.ativo
+      ? `${inicios.join(", ") || "sem horário"} · ${textoDias(p)} · ${fmtMin(total)}` : "desligado";
+    $(`[data-bloco-semana="${i}"]`).style.display = p.modo === "semana" ? "" : "none";
+    $(`[data-bloco-intervalo="${i}"]`).style.display = p.modo === "intervalo" ? "" : "none";
+    let aviso = "";
+    if (p.ativo && !inicios.length) aviso = "O programa está ligado, mas não tem horário de início.";
+    else if (p.ativo && total === 0) aviso = "O programa está ligado, mas nenhum setor tem tempo.";
+    else if (p.ativo && p.modo === "semana" && !p.dias.some(Boolean)) aviso = "O programa está ligado, mas nenhum dia está marcado.";
+    else {
+      const emMin = inicios.map(h => { const [hh, mm] = h.split(":").map(Number); return hh * 60 + mm; });
+      const k = emMin.findIndex((m, j) => j > 0 && m < emMin[j - 1] + total);
+      if (p.ativo && k > 0) aviso = `O início das ${inicios[k]} chega antes de a rega das ${inicios[k - 1]} terminar (${fmtMin(total)}). Não é erro: ele espera na fila.`;
+    }
+    const el = $(`[data-aviso-prog="${i}"]`);
+    el.textContent = aviso; el.classList.toggle("oculto", !aviso);
   });
 }
 
@@ -964,30 +1079,25 @@ function ligarAjustes(raiz) {
     if (el.dataset.cfg) {
       let v = el.type === "checkbox" ? el.checked : el.value;
       if (el.type === "number") v = el.value === "" ? null : Number(el.value);
+      if (el.type === "time" && v === "") v = null;
       definir(estadoApp.rascunho, el.dataset.cfg, v);
       if (el.dataset.cfg.endsWith(".nome") || el.dataset.cfg.endsWith(".duracaoMin")) preencherResumoSetores();
-      if (el.dataset.cfg.endsWith(".duracaoMin")) verificarConflitos();
-    } else if (el.dataset.horario) {
-      const [i, k] = el.dataset.horario.split(".").map(Number);
-      estadoApp.rascunho.setores[i].horarios[k] = el.value;
-      estadoApp.rascunho.setores[i].horarios.sort();
-      verificarConflitos();
+      if (el.dataset.cfg.startsWith("programas.") || el.dataset.cfg.endsWith(".nome")) resumirProgramas();
     }
     marcarSujo();
   });
-  raiz.addEventListener("change", ev => { if (ev.target.dataset.cfg?.endsWith(".ativo") || ev.target.dataset.horario) preencherAjustes(); });
+  raiz.addEventListener("change", ev => { if (ev.target.dataset.cfg?.endsWith(".ativo")) preencherAjustes(); });
   raiz.addEventListener("click", ev => {
     const b = ev.target.closest("button"); if (!b || b.disabled) return;
     const seg = b.closest("[data-seg]"), dias = b.closest("[data-dias]");
     if (seg) { definir(estadoApp.rascunho, seg.dataset.seg, b.dataset.valor); preencherAjustes(); marcarSujo(); }
     else if (dias) { const arr = obter(estadoApp.rascunho, dias.dataset.dias); arr[b.dataset.i] = arr[b.dataset.i] ? 0 : 1; preencherAjustes(); marcarSujo(); }
-    else if (b.dataset.addHorario) { const s = estadoApp.rascunho.setores[b.dataset.addHorario]; if (s.horarios.length < 6) s.horarios.push("12:00"); s.horarios.sort(); preencherAjustes(); marcarSujo(); }
-    else if (b.dataset.delHorario) { const [i, k] = b.dataset.delHorario.split(".").map(Number); estadoApp.rascunho.setores[i].horarios.splice(k, 1); preencherAjustes(); marcarSujo(); }
+    else if (b.id === "btnPausar") { const dias = Math.max(0, Math.min(14, Number($("#diasPausa").value) || 0)); enviar({ acao: "chuva", dias }, dias ? "Regas em pausa" : "Pausa cancelada").then(preencherSeAjustes); }
     else if (b.id === "btnAcertarHora") enviar({ acao: "acertarHora", hora: new Date().toISOString() }, "Hora acertada");
     else if (b.id === "btnExportar") exportarAjustes();
     else if (b.id === "btnPadrao") confirmar("Restaurar padrão?", "Os ajustes voltam ao padrão de fábrica no formulário. Nada muda até você salvar.", "Restaurar", () => {
       const atual = estadoApp.rascunho; const p = configPadrao(); p.rede = atual.rede; estadoApp.rascunho = p; preencherAjustes(); marcarSujo(); });
-    else if (b.id === "btnReiniciar") confirmar("Reiniciar o controlador?", "Qualquer rega em andamento para, e nenhuma é retomada depois do reinício.", "Reiniciar", () => enviar({ acao: "reiniciar" }, "Reiniciando…"));
+    else if (b.id === "btnReiniciar") confirmar("Reiniciar o controlador?", "Qualquer rega em andamento para. Se a retomada estiver ligada, ela volta depois da espera.", "Reiniciar", () => enviar({ acao: "reiniciar" }, "Reiniciando…"));
   });
   $("#arqImportar", raiz).addEventListener("change", async ev => {
     const f = ev.target.files[0]; if (!f) return;
@@ -1015,6 +1125,9 @@ function validarRascunho() {
   if (invalido.length) { invalido[0].closest("details.grupo").open = true; invalido[0].closest("details.subsetor")?.setAttribute("open", ""); invalido[0].focus(); return "Há um valor fora da faixa."; }
   const r = estadoApp.rascunho;
   for (const s of r.setores) if (s.duracaoMin > s.tempoMaxMin) return `${s.nome}: a duração passa do tempo máximo.`;
+  for (const [i, p] of r.programas.entries())
+    for (const [st, s] of r.setores.entries())
+      if ((p.minutos[st] || 0) > s.tempoMaxMin) return `Programa ${LETRAS[i]}: ${s.nome} passa do tempo máximo do setor (${s.tempoMaxMin} min).`;
   if (r.registro.drive && !/^https:\/\//.test(r.registro.driveUrl)) return "Informe o endereço do Apps Script para usar o Drive.";
   const ns = $("#novaSenha").value; if (ns && ns.length < 6) return "A nova senha precisa de 6 caracteres ou mais.";
   return null;
@@ -1024,6 +1137,15 @@ async function salvar() {
   if (!exigirLogin()) return;
   const erro = validarRascunho(); if (erro) { toast(erro); return; }
   const envio = structuredClone(estadoApp.rascunho);
+  const hoje = new Date().toLocaleDateString("sv");  // AAAA-MM-DD, na hora local
+  envio.programas.forEach((p, i) => {
+    p.minutos = p.minutos.map(m => m || 0);
+    p.intervaloDias = p.intervaloDias || 2;
+    p.ajustePct = p.ajustePct || 100;
+    // O intervalo começa a contar no dia em que é ligado ou alterado.
+    const antes = estadoApp.config.programas[i];
+    if (p.modo === "intervalo" && (antes.modo !== "intervalo" || antes.intervaloDias !== p.intervaloDias || !p.inicioIntervalo)) p.inicioIntervalo = hoje;
+  });
   const ns = $("#novaSenha").value; if (ns) envio.seguranca.novaSenha = ns;
   try {
     await api.salvarConfig(envio);
@@ -1059,7 +1181,9 @@ document.addEventListener("click", ev => {
   else if (b.dataset.acao === "pararTudo") { if (exigirLogin()) confirmar("Parar tudo?", "O setor atual fecha e a fila é esvaziada. A agenda continua valendo para as próximas regas.", "Parar tudo", () => enviar({ acao: "pararTudo" }, "Parando tudo")); }
   else if (b.dataset.configSetor) { location.hash = "ajustes"; setTimeout(() => { const g = $$("details.grupo")[1]; g.open = true; const d = $(`[data-setor-det="${b.dataset.configSetor}"]`); d.open = true; d.scrollIntoView({ block: "start" }); }, 50); }
   else if (b.id === "verTodos") { estadoApp.mostrarTodos = true; desenharSetores(); }
-  else if (b.id === "btnCiclo") { if (exigirLogin()) confirmar("Iniciar ciclo agora?", "Todos os setores ativos entram na fila, cada um pela sua duração padrão.", "Iniciar", () => enviar({ acao: "ciclo" }, "Ciclo iniciado")); }
+  else if (b.id === "btnPrograma") { if (exigirLogin()) abrirProgramas(); }
+  else if (b.dataset.iniciarProg) { const i = Number(b.dataset.iniciarProg); $("#dlgPrograma").close(); enviar({ acao: "programa", programa: i }, `Programa ${LETRAS[i]} iniciado`); }
+  else if (b.hasAttribute("data-iniciar-ciclo")) { $("#dlgPrograma").close(); confirmar("Iniciar o ciclo de teste?", "Todos os setores ativos entram na fila, cada um pela sua duração padrão.", "Iniciar", () => enviar({ acao: "ciclo" }, "Ciclo iniciado")); }
   else if (b.id === "chipStatus") abrirStatus();
   else if (b.id === "chipSessao") { if (estadoApp.logado) api.sair().then(() => { estadoApp.logado = false; atualizar(); preencherSeAjustes(); toast("Você saiu"); }); else abrirEntrar(); }
   else if (b.id === "btnEntrarOk") entrar();
