@@ -416,21 +416,35 @@ def juntar_tampa(raiz, occ_base, occ_tampa):
     """Junta de rotação na dobradiça: a tampa abre girando em volta do pino."""
     global etapa
     etapa = "junta da dobradiça"
+    # O ponto do eixo fica num esboço no plano XZ. A junta usa os eixos desse
+    # esboço, e o Z dele (a normal do plano) é o eixo do pino, paralelo ao Y
+    # da caixa.
     s = occ_base.component.sketches.add(occ_base.component.xZConstructionPlane)
     s.name = "Eixo da dobradica"
     ponto_eixo = s.sketchPoints.add(s.modelToSketchSpace(ponto(eixo[0], 0, eixo[1])))
     geometria = adsk.fusion.JointGeometry.createByPoint(ponto_eixo.createForAssemblyContext(occ_base))
     juntas = raiz.asBuiltJoints
     entrada = juntas.createInput(occ_tampa, occ_base, geometria)
-    entrada.setAsRevoluteJointMotion(adsk.fusion.JointDirections.YAxisJointDirection)
+    entrada.setAsRevoluteJointMotion(adsk.fusion.JointDirections.ZAxisJointDirection)
     junta = juntas.add(entrada)
     junta.name = "Dobradica"
-    # Abrir é girar para o lado negativo, até 110 graus.
-    limites = junta.jointMotion.rotationLimits
+
+    # O sentido de abrir depende do lado para onde a normal do plano aponta.
+    # Gira 60 graus para um lado e vê se a tampa se afastou da caixa.
+    etapa = "limites da dobradiça"
+    movimento = junta.jointMotion
+    movimento.rotationValue = math.radians(-60)
+    abre_negativo = occ_tampa.boundingBox.maxPoint.z > (P + t + 20) * CM
+    movimento.rotationValue = 0
+    limites = movimento.rotationLimits
     limites.isMinimumValueEnabled = True
-    limites.minimumValue = math.radians(-110)
     limites.isMaximumValueEnabled = True
-    limites.maximumValue = 0
+    if abre_negativo:
+        limites.minimumValue = math.radians(-110)
+        limites.maximumValue = 0
+    else:
+        limites.minimumValue = 0
+        limites.maximumValue = math.radians(110)
 
 
 # ---------------------------------------------------------------------------
