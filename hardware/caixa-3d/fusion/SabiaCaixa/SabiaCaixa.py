@@ -402,7 +402,35 @@ def desenhar_tampa(comp):
     etapa = "tampa: furos"
     circulos(d, "Furo do encoder", [enc_c], d_encoder, P - 4, t + 8, CORTAR, corpo)
     circulos(d, "Furos de fechamento", fech, d_passante, P - 4, t + 8, CORTAR, corpo)
+
+    # A tela vai presa na tampa: o bloco dela fica aqui, para abrir junto.
+    # Ao exportar para imprimir, salve só o corpo "Tampa".
+    etapa = "tampa: bloco da tela"
+    x0, y0 = lcd_c[0] - lcd[0] / 2, lcd_c[1] - lcd[1] / 2
+    f = retangulos(d, "Tela (bloco)", [(x0, y0, x0 + lcd[0], y0 + lcd[1])], P - lcd[2], lcd[2], NOVO, None)
+    f.bodies.item(0).name = "Tela (so para conferir)"
     return corpo
+
+
+def juntar_tampa(raiz, occ_base, occ_tampa):
+    """Junta de rotação na dobradiça: a tampa abre girando em volta do pino."""
+    global etapa
+    etapa = "junta da dobradiça"
+    s = occ_base.component.sketches.add(occ_base.component.xZConstructionPlane)
+    s.name = "Eixo da dobradica"
+    ponto_eixo = s.sketchPoints.add(s.modelToSketchSpace(ponto(eixo[0], 0, eixo[1])))
+    geometria = adsk.fusion.JointGeometry.createByPoint(ponto_eixo.createForAssemblyContext(occ_base))
+    juntas = raiz.asBuiltJoints
+    entrada = juntas.createInput(occ_tampa, occ_base, geometria)
+    entrada.setAsRevoluteJointMotion(adsk.fusion.JointDirections.YAxisJointDirection)
+    junta = juntas.add(entrada)
+    junta.name = "Dobradica"
+    # Abrir é girar para o lado negativo, até 110 graus.
+    limites = junta.jointMotion.rotationLimits
+    limites.isMinimumValueEnabled = True
+    limites.minimumValue = math.radians(-110)
+    limites.isMaximumValueEnabled = True
+    limites.maximumValue = 0
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +446,6 @@ def desenhar_modulos(comp):
         ("ESP32-S3", (t + p_expan[0], t + p_expan[1], t + alt_suporte), expan),
         ("RTC", (t + p_rtc[0], t + p_rtc[1], t + alt_suporte), rtc),
         ("microSD", (t + p_sd[0], t + p_sd[1] + div + sd_afasta, t + sd_elev), (sd[0], sd[2], sd[1])),
-        ("Tela", (lcd_c[0] - lcd[0] / 2, lcd_c[1] - lcd[1] / 2, P - lcd[2]), lcd),
     ]
     for nome, (x, y, z), (lx, ly, lz) in blocos:
         f = retangulos(d, nome, [(x, y, x + lx, y + ly)], z, lz, NOVO, None)
@@ -436,16 +463,30 @@ def run(context):
         design.designType = adsk.fusion.DesignTypes.ParametricDesignType
         raiz = design.rootComponent
 
-        desenhar_base(novo_componente(raiz, "Base").component)
-        desenhar_tampa(novo_componente(raiz, "Tampa").component)
-        occ = novo_componente(raiz, "Componentes (so para conferir)")
-        desenhar_modulos(occ.component)
+        occ_base = novo_componente(raiz, "Base")
+        desenhar_base(occ_base.component)
+        occ_tampa = novo_componente(raiz, "Tampa")
+        desenhar_tampa(occ_tampa.component)
+        occ_mod = novo_componente(raiz, "Componentes (so para conferir)")
+        desenhar_modulos(occ_mod.component)
+
+        # Base e componentes ficam fixos; só a tampa se mexe.
+        occ_base.isGrounded = True
+        occ_mod.isGrounded = True
+        aviso_junta = ""
+        try:
+            juntar_tampa(raiz, occ_base, occ_tampa)
+        except Exception:
+            aviso_junta = ("\n\nNão consegui criar a junta da dobradiça. Faça à mão: MONTAR > Junta "
+                           "conforme construída, Tampa e Base, tipo Rotação, posição no furo do pino "
+                           "(passo a passo em docs/caixa.md).")
 
         app.activeViewport.fit()
         ui.messageBox(
             "Caixa desenhada: %.1f x %.1f x %.1f mm (base %.1f + tampa %.1f).\n\n"
+            "Para abrir a tampa, arraste-a com o mouse: ela gira na dobradiça (até 110 graus).\n"
             "Para ver por dentro, esconda o componente 'Tampa' (ícone de olho no navegador, à esquerda).\n"
-            "Para imprimir, exporte só 'Base' e só 'Tampa' (botão direito > Salvar como malha)."
-            % (W, H, P + t, P, t), "SABIÁ")
+            "Para imprimir, exporte só o corpo 'Base' e só o corpo 'Tampa' (botão direito > Salvar como malha)."
+            "%s" % (W, H, P + t, P, t, aviso_junta), "SABIÁ")
     except Exception:
         ui.messageBox("Parou na etapa: %s\n\n%s" % (etapa, traceback.format_exc()), "SABIÁ: erro")

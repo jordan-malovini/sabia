@@ -53,8 +53,18 @@ O script `hardware/caixa-3d/fusion/SabiaCaixa` desenha a mesma caixa no Fusion, 
 
 - Componente **Base**: caixa, divisórias da fonte, suportes, paredinha do microSD, abas de parede, dobradiça e todos os furos.
 - Componente **Tampa**: placa, aba de encaixe, janela e suportes da tela, encoder, dobradiça e furos de fechamento.
-- Componente **Componentes (só para conferir)**: blocos do tamanho de cada módulo. Não vão para a impressão.
+- Componente **Componentes (só para conferir)**: blocos do tamanho de cada módulo. O bloco da tela fica dentro da Tampa, para abrir com ela. Nenhum deles vai para a impressão.
 - Para ver por dentro, esconda a Tampa no navegador (o ícone de olho, à esquerda).
+- **A tampa abre de verdade:** ela está ligada à base por uma junta de rotação na dobradiça ("Dobradica", na linha do tempo). Arraste a tampa com o mouse para abrir, até 110 graus. A Base e os componentes ficam fixos. A tela vai junto com a tampa.
+
+**Fazer a junta à mão** (num projeto de antes desta versão, ou se o script avisar que não conseguiu):
+
+1. No navegador, botão direito em **Base** → **Fixar**. Faça o mesmo com **Componentes**.
+2. **MONTAR → Junta conforme construída** (`Shift+J`), já que a tampa está no lugar certo.
+3. Clique na **Tampa** e depois na **Base**.
+4. Em **Tipo**, escolha **Rotação**.
+5. Em **Posição**, clique na borda circular do furo do pino de um dos nós da dobradiça. O eixo de rotação passa a ser o do pino.
+6. **OK**. Para limitar a abertura: botão direito na junta → **Editar limites da junta**, e marque mínimo e máximo, por exemplo de 0 a 110 graus (ou de -110 a 0, conforme o lado em que ela abre).
 
 **Editar:**
 
