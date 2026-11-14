@@ -51,6 +51,7 @@ O mapa de pinos está em [mapa-de-pinos.md](mapa-de-pinos.md).
 ## Proteções e segurança elétrica
 
 - Fusível de 3 A na saída de 5 V para proteger a fiação, já que a fonte entrega até 10 A, e diodo TVS contra picos.
+- Fusível de 2 A retardado na entrada da rede, antes da fonte, num porta-fusível de linha dentro da caixa (ver `docs/caixa.md`).
 - Fonte com aterramento, bornes da rede cobertos e cabo com alívio de tração.
 - Conferir a corrente de partida da bomba e usar uma contatora se o relé não aguentar.
 - Cabos externos resistentes a UV, emendas seladas e curva de pingar antes de cada entrada.

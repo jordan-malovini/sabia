@@ -40,7 +40,22 @@ As divisórias têm 49,5 mm de altura: ficam acima da fonte (40 mm) e abaixo da 
 
 ## Editar no Fusion
 
-O script `hardware/caixa-3d/fusion/SabiaCaixa` desenha a mesma caixa no Fusion, como um projeto nativo: cada parte vira um esboço e uma extrusão com nome na linha do tempo.
+O script `hardware/caixa-3d/fusion/SabiaCaixa` desenha a caixa no Fusion, como um projeto nativo: cada parte vira um esboço e uma extrusão com nome na linha do tempo.
+
+**Rev B (só no Fusion):** a Rev A com mais espaço para os cabos. Daqui para frente, o script do Fusion é a referência; o `caixa.scad` fica na Rev A.
+
+| | Rev A | Rev B |
+| --- | --- | --- |
+| Folga em volta dos módulos | 3 mm | 5 mm |
+| Dos dois lados da placa do ESP (fios dos bornes) | 3 mm | 12 mm |
+| Embaixo dos relés (fios das válvulas) | 3 mm | 17 mm |
+| À esquerda da fonte (rede e fusível) | 12 mm | 25 mm |
+| Tamanho externo, sem as abas de parede | 217 × 240 × 70 mm | 250 × 260 × 70 mm |
+| Com as abas de parede | 245 × 240 mm | 278 × 260 mm |
+
+Os quatro espaços estão no começo do `SabiaCaixa.py` (`folga`, `bornes_esp`, `cabos_reles`, `margem_rede`), se quiser ajustar.
+
+> **Impressora:** a base da Rev B (com as abas) não cabe numa mesa de 256 × 256 mm. Antes de imprimir, confira a mesa: numa de 300 × 300 mm cabe; numa menor, é preciso trocar as abas de parede por furos no fundo ou dividir a base.
 
 **Rodar (uma vez):**
 
@@ -53,13 +68,13 @@ O script `hardware/caixa-3d/fusion/SabiaCaixa` desenha a mesma caixa no Fusion, 
 
 - Componente **Base**: caixa, divisórias da fonte, suportes, paredinha do microSD, abas de parede, dobradiça e todos os furos.
 - Componente **Tampa**: placa, aba de encaixe, janela e suportes da tela, encoder, dobradiça e furos de fechamento.
-- Componente **Componentes (só para conferir)**: blocos do tamanho de cada módulo. O bloco da tela fica dentro da Tampa, para abrir com ela. Nenhum deles vai para a impressão.
+- Componente **Gabarito da tela**: ao lado da caixa, o pedaço da tampa com a janela, o rebaixo do acrílico e os 4 suportes da tela (103 × 80 mm). Imprima primeiro, em uns 20 minutos, e encaixe a tela de verdade: se os furos, a janela e a altura dos suportes baterem, a tampa também vai bater.
 - Para ver por dentro, esconda a Tampa no navegador (o ícone de olho, à esquerda).
-- **A tampa abre de verdade:** ela está ligada à base por uma junta de rotação na dobradiça ("Dobradica", na linha do tempo). Arraste a tampa com o mouse para abrir, até 110 graus. A Base e os componentes ficam fixos. A tela vai junto com a tampa.
+- **A tampa abre de verdade:** ela está ligada à base por uma junta de rotação na dobradiça ("Dobradica", na linha do tempo). Arraste a tampa com o mouse para abrir, até 110 graus. A Base fica fixa.
 
 **Fazer a junta à mão** (num projeto de antes desta versão, ou se o script avisar que não conseguiu):
 
-1. No navegador, botão direito em **Base** → **Fixar**. Faça o mesmo com **Componentes**.
+1. No navegador, botão direito em **Base** → **Fixar**.
 2. **MONTAR → Junta conforme construída** (`Shift+J`), já que a tampa está no lugar certo.
 3. Clique na **Tampa** e depois na **Base**.
 4. Em **Tipo**, escolha **Rotação**.
@@ -77,6 +92,15 @@ O script `hardware/caixa-3d/fusion/SabiaCaixa` desenha a mesma caixa no Fusion, 
 **Imprimir:** botão direito no corpo **Base** (e depois na **Tampa**) → **Salvar como malha** → 3MF ou STL. A tampa se imprime com a face de fora na mesa, então vire a peça no fatiador.
 
 O script não foi testado num Fusion de verdade, só num simulado. Se ele parar, a mensagem diz em qual etapa parou: mande um print dela.
+
+## Fusível da rede
+
+Além do fusível de 3 A na saída de 5 V (ver `docs/hardware.md`), vale um fusível na **entrada da rede**, antes da fonte, dentro da caixa:
+
+- **Onde:** no compartimento da fonte, entre o prensa-cabos da rede e os bornes da fonte. A Rev B deixa 25 mm livres à esquerda da fonte para isso.
+- **Qual:** um porta-fusível de linha (aquele que fica no meio do fio), com fusível 5 × 20 mm de **2 A retardado**. Retardado porque a fonte puxa um pico de corrente ao ligar. Confira na etiqueta da fonte o fusível que o fabricante recomenda.
+- **Troca:** abre a tampa e troca. O fusível só queima se houver defeito; não precisa ficar do lado de fora.
+- **Bomba:** se a bomba for ligada na rede por uma contatora, a proteção dela (disjuntor) fica no quadro elétrico, não na caixa do controlador.
 
 ## O que medir antes de imprimir
 
