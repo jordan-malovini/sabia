@@ -40,6 +40,7 @@ Formato: uma seção por versão, da mais nova para a mais antiga.
 - Relógio acertado pela internet (NTP) quando o Wi-Fi da casa conecta e uma vez por dia, no fuso escolhido.
 - Display: tela apaga depois de um tempo sem uso (o primeiro toque só acende) e opção de travar os comandos, deixando ligar e parar só pela página.
 - Script do Fusion (`hardware/caixa-3d/fusion/SabiaCaixa`) que desenha a caixa como projeto nativo, para editar pela linha do tempo. Passo a passo em `docs/caixa.md`.
+- Caixa Rev B no Fusion: mais espaço para os fios dos bornes do ESP e das válvulas e para o fusível da rede (250 × 260 × 70 mm), gabarito da tela para testar o encaixe e tampa que abre na dobradiça. Os blocos dos componentes saíram.
 - Nome do projeto: SABIÁ (Sistema Automático de Balanço e Irrigação Agrícola).
 - Documentação dividida em README e `docs/` (requisitos, arquitetura, hardware e mapa de pinos).
 - Requisitos de segurança RF14 (saídas desligadas no boot), RF15 (watchdog) e RF16 (senha e autenticação na página web).
